@@ -1,10 +1,15 @@
 #include <cassert>
+#include <filesystem>
+#include <string>
 
+#include "evr/runtime/config/runtime_config_loader.h"
+#include "evr/runtime/deployment/phase1_deployment.h"
 #include "evr/runtime/source/source_session.h"
 #include "evr/runtime/supervisor/supervisor_session.h"
 #include "evr/runtime/worker/worker_session.h"
 
 int main() {
+  namespace fs = std::filesystem;
   using evr::runtime::session::State;
 
   evr::runtime::supervisor::SupervisorSession supervisor_session;
@@ -43,6 +48,52 @@ int main() {
   assert(worker_session.GetSnapshot().state == State::kRunning);
   worker_session.Stop();
   assert(worker_session.state() == State::kStopped);
+
+  evr::runtime::deployment::Phase1DeploymentSpec spec;
+  spec.deployment_id = "phase1-test";
+  spec.supervisor = supervisor_config;
+  spec.source = source_config;
+  spec.worker = worker_config;
+  spec.worker.source_session_id.clear();
+  spec.worker.supervisor_endpoint.clear();
+
+  std::string error;
+  assert(spec.Normalize(&error));
+  assert(spec.worker.source_session_id == spec.source.session_id);
+  assert(spec.worker.supervisor_endpoint == spec.supervisor.control_endpoint);
+  assert(spec.DescribeWiring().find("worker[worker-test]") != std::string::npos);
+
+  evr::runtime::deployment::DeploymentController deployment_controller;
+  assert(deployment_controller.Apply(spec, &error));
+  const auto status = deployment_controller.GetStatus();
+  assert(status.deployment_id == "phase1-test");
+  assert(status.state == State::kConfigured);
+  assert(status.wiring.find("supervisor[supervisor-test]") != std::string::npos);
+
+  const fs::path project_root = fs::path(__FILE__).parent_path().parent_path();
+  evr::runtime::config::RuntimeConfigLoader loader;
+
+  evr::runtime::source::SourceAppConfig loaded_source_config;
+  assert(loader.LoadSourceAppConfig((project_root / "configs/runtime-source.v1.example.yaml").string(),
+                                    &loaded_source_config, &error));
+  assert(loaded_source_config.session.session_id == "source-demo");
+  assert(loaded_source_config.session.decode_mode == "jetson-nvdec");
+
+  evr::runtime::supervisor::SupervisorAppConfig loaded_supervisor_config;
+  assert(loader.LoadSupervisorAppConfig(
+      (project_root / "configs/runtime-supervisor.v1.example.yaml").string(),
+      &loaded_supervisor_config, &error));
+  assert(loaded_supervisor_config.session.session_id == "supervisor-main");
+  assert(loaded_supervisor_config.deployment.supervisor.control_endpoint ==
+         loaded_supervisor_config.session.control_endpoint);
+
+  evr::runtime::worker::WorkerAppConfig loaded_worker_config;
+  assert(loader.LoadWorkerAppConfig((project_root / "configs/runtime-worker.v1.example.yaml").string(),
+                                    &loaded_worker_config, &error));
+  assert(loaded_worker_config.source.session_id == "source-demo");
+  assert(loaded_worker_config.worker.session_id == "worker-0");
+  assert(loaded_worker_config.worker.supervisor_endpoint ==
+         "unix:///tmp/evr-supervisor.sock");
 
   return 0;
 }

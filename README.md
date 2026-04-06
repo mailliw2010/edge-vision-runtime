@@ -12,7 +12,7 @@ C++ Runtime 仓，当前先对齐**第一阶段最小闭环**：
 - `cmd/`：二进制入口
 - `include/evr/runtime/`：公开接口与占位类型
 - `src/`：最小实现
-- `configs/`：v1 配置模板（当前只是结构草案，尚未接解析）
+- `configs/`：v1 配置模板（现在可被极简 YAML-ish loader 读取，用于 phase-1 占位接线）
 - `tests/`：smoke test
 
 ```text
@@ -23,11 +23,15 @@ C++ Runtime 仓，当前先对齐**第一阶段最小闭环**：
 │   └── runtime-worker/
 ├── configs/
 ├── include/evr/runtime/
+│   ├── config/
+│   ├── deployment/
 │   ├── session/
 │   ├── source/
 │   ├── supervisor/
 │   └── worker/
 ├── src/
+│   ├── config/
+│   ├── deployment/
 │   ├── session/
 │   ├── source/
 │   ├── supervisor/
@@ -39,15 +43,31 @@ C++ Runtime 仓，当前先对齐**第一阶段最小闭环**：
 
 这版只保留第一阶段真正需要的接口边界：
 
-- `SupervisorApp` / `SupervisorSession`：后续承接调度、恢复、状态汇总
+- `SupervisorApp` / `SupervisorSession`：后续承接调度、恢复、状态汇总；当前已挂上最小 deployment apply/status 占位
 - `SourceApp` / `SourceSession`：后续承接拉流、解码、帧分发
 - `WorkerApp` / `WorkerSession`：后续承接 TensorRT 推理、模型生命周期、本机 IPC
 
 其中：
 
-- `runtime-supervisor` 先只驱动 supervisor session
+- `runtime-supervisor` 现在会在启动 supervisor session 后 apply 一个 phase-1 deployment 占位，并打印 status
 - `runtime-source` 先独立保留 source 占位入口
 - `runtime-worker` 暂时串起 source + worker，作为第一阶段最小闭环
+
+## phase-1 占位接线
+
+当前新增了两个很薄的层：
+
+- `config::RuntimeConfigLoader`：读取 examples 这类简单 YAML-ish 文件，只支持 `section -> key: value` 结构
+- `deployment::Phase1DeploymentSpec` / `DeploymentController`：显式表达 supervisor / source / worker 的引用关系，并提供 `apply/status` 占位接口
+
+`Phase1DeploymentSpec::Normalize()` 当前会做几件最小但关键的事：
+
+- 保证三者 `proto_version` 一致
+- 保证 `worker.source_session_id == source.session_id`
+- 保证 `worker.supervisor_endpoint == supervisor.control_endpoint`
+- 在字段留空时做最小 auto-wire
+
+这让 phase-1 的控制面关系先被固定下来，但仍然不引入真实 IPC、调度器或推理执行。
 
 ## 尚未接入
 
@@ -55,7 +75,7 @@ C++ Runtime 仓，当前先对齐**第一阶段最小闭环**：
 - Jetson NVDEC / TensorRT 具体适配
 - supervisor <-> worker 的真实控制面链路
 - source -> worker 的帧通路
-- 配置文件解析与参数校验
+- 完整 YAML 解析、schema 校验、CLI 传参接线（当前只有极简 YAML-ish loader，够读取 examples）
 
 ## 构建
 
