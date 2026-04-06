@@ -1,0 +1,9 @@
+supervisor:
+  session_id: supervisor-main
+  proto_version: v1
+  control_endpoint: unix:///tmp/evr-supervisor.sock
+
+orchestration:
+  restart_policy: on-failure
+  expected_worker_backend: tensorrt
+  target_device_class: jetson

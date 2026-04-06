@@ -1,6 +1,6 @@
-#include <iostream>
+#include "evr/runtime/supervisor/supervisor_app.h"
 
 int main() {
-  std::cout << "edge-vision runtime-supervisor skeleton" << std::endl;
-  return 0;
+  evr::runtime::supervisor::SupervisorApp app;
+  return app.Run();
 }

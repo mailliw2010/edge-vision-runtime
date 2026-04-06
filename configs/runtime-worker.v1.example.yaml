@@ -1,0 +1,13 @@
+source:
+  session_id: source-demo
+  source_uri: rtsp://example.local/camera-0
+  proto_version: v1
+  decode_mode: jetson-nvdec
+
+worker:
+  session_id: worker-0
+  supervisor_endpoint: unix:///tmp/evr-supervisor.sock
+  source_session_id: source-demo
+  proto_version: v1
+  inference_backend: tensorrt
+  engine_path: models/detector.plan

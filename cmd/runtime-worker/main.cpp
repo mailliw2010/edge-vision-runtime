@@ -1,6 +1,6 @@
-#include <iostream>
+#include "evr/runtime/worker/worker_app.h"
 
 int main() {
-  std::cout << "edge-vision runtime-worker skeleton" << std::endl;
-  return 0;
+  evr::runtime::worker::WorkerApp app;
+  return app.Run();
 }

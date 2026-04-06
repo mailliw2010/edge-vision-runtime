@@ -1,0 +1,5 @@
+source:
+  session_id: source-demo
+  source_uri: rtsp://example.local/camera-0
+  proto_version: v1
+  decode_mode: jetson-nvdec
