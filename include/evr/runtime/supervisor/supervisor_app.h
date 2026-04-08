@@ -1,5 +1,7 @@
 #pragma once
 
+#include <string>
+
 #include "evr/runtime/deployment/phase1_deployment.h"
 #include "evr/runtime/supervisor/supervisor_session.h"
 
@@ -15,8 +17,13 @@ class SupervisorApp {
   explicit SupervisorApp(SupervisorAppConfig config = {});
 
   int Run();
+  int ApplyDeployment();
+  int ShowDeploymentStatus() const;
 
  private:
+  bool BuildDeploymentSpec(deployment::Phase1DeploymentSpec* spec,
+                           std::string* error = nullptr) const;
+
   SupervisorAppConfig config_;
 };
 

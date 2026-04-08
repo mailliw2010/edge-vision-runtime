@@ -87,6 +87,18 @@ int main() {
   assert(loaded_supervisor_config.deployment.supervisor.control_endpoint ==
          loaded_supervisor_config.session.control_endpoint);
 
+  evr::runtime::deployment::Phase1DeploymentSpec loaded_deployment_spec;
+  assert(loader.LoadPhase1DeploymentSpec(
+      (project_root / "configs/runtime-phase1-deployment.v1.example.yaml").string(),
+      &loaded_deployment_spec, &error));
+  assert(loaded_deployment_spec.deployment_id == "phase1-demo");
+  assert(loaded_deployment_spec.source.session_id == "source-demo");
+  assert(loaded_deployment_spec.worker.session_id == "worker-0");
+  assert(loaded_deployment_spec.Normalize(&error));
+  assert(loaded_deployment_spec.worker.source_session_id == loaded_deployment_spec.source.session_id);
+  assert(loaded_deployment_spec.worker.supervisor_endpoint ==
+         loaded_deployment_spec.supervisor.control_endpoint);
+
   evr::runtime::worker::WorkerAppConfig loaded_worker_config;
   assert(loader.LoadWorkerAppConfig((project_root / "configs/runtime-worker.v1.example.yaml").string(),
                                     &loaded_worker_config, &error));

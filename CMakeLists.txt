@@ -85,4 +85,16 @@ if(BUILD_TESTING)
   target_link_libraries(runtime_sessions_smoke_test PRIVATE evr::runtime)
   evr_apply_common_settings(runtime_sessions_smoke_test)
   add_test(NAME runtime_sessions_smoke_test COMMAND runtime_sessions_smoke_test)
+  add_test(NAME runtime_source_cli_smoke_test
+    COMMAND $<TARGET_FILE:runtime-source> --config
+            ${PROJECT_SOURCE_DIR}/configs/runtime-source.v1.example.yaml)
+  add_test(NAME runtime_worker_cli_smoke_test
+    COMMAND $<TARGET_FILE:runtime-worker> --config
+            ${PROJECT_SOURCE_DIR}/configs/runtime-worker.v1.example.yaml)
+  add_test(NAME runtime_supervisor_apply_cli_smoke_test
+    COMMAND $<TARGET_FILE:runtime-supervisor> apply --config
+            ${PROJECT_SOURCE_DIR}/configs/runtime-phase1-deployment.v1.example.yaml)
+  add_test(NAME runtime_supervisor_status_cli_smoke_test
+    COMMAND $<TARGET_FILE:runtime-supervisor> status --config
+            ${PROJECT_SOURCE_DIR}/configs/runtime-phase1-deployment.v1.example.yaml)
 endif()

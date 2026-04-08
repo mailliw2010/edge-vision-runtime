@@ -108,6 +108,42 @@ std::string GetValue(const SectionMap& sections,
   return value_it->second;
 }
 
+void FillSupervisorSessionConfig(const SectionMap& sections,
+                                 supervisor::SupervisorSessionConfig* config) {
+  config->session_id = GetValue(sections, "supervisor", "session_id", config->session_id);
+  config->proto_version =
+      GetValue(sections, "supervisor", "proto_version", config->proto_version);
+  config->control_endpoint =
+      GetValue(sections, "supervisor", "control_endpoint", config->control_endpoint);
+}
+
+void FillSourceSessionConfig(const SectionMap& sections, source::SourceSessionConfig* config) {
+  config->session_id = GetValue(sections, "source", "session_id", config->session_id);
+  config->source_uri = GetValue(sections, "source", "source_uri", config->source_uri);
+  config->proto_version = GetValue(sections, "source", "proto_version", config->proto_version);
+  config->decode_mode = GetValue(sections, "source", "decode_mode", config->decode_mode);
+}
+
+void FillWorkerSessionConfig(const SectionMap& sections, worker::WorkerSessionConfig* config) {
+  config->session_id = GetValue(sections, "worker", "session_id", config->session_id);
+  config->supervisor_endpoint =
+      GetValue(sections, "worker", "supervisor_endpoint", config->supervisor_endpoint);
+  config->source_session_id =
+      GetValue(sections, "worker", "source_session_id", config->source_session_id);
+  config->proto_version = GetValue(sections, "worker", "proto_version", config->proto_version);
+  config->inference_backend =
+      GetValue(sections, "worker", "inference_backend", config->inference_backend);
+  config->engine_path = GetValue(sections, "worker", "engine_path", config->engine_path);
+}
+
+void FillPhase1DeploymentSpec(const SectionMap& sections,
+                              deployment::Phase1DeploymentSpec* spec) {
+  spec->deployment_id = GetValue(sections, "deployment", "deployment_id", spec->deployment_id);
+  FillSupervisorSessionConfig(sections, &spec->supervisor);
+  FillSourceSessionConfig(sections, &spec->source);
+  FillWorkerSessionConfig(sections, &spec->worker);
+}
+
 }  // namespace
 
 bool RuntimeConfigLoader::LoadSourceAppConfig(const std::string& file_path,
@@ -125,11 +161,7 @@ bool RuntimeConfigLoader::LoadSourceAppConfig(const std::string& file_path,
     return false;
   }
 
-  config->session.session_id = GetValue(sections, "source", "session_id", config->session.session_id);
-  config->session.source_uri = GetValue(sections, "source", "source_uri", config->session.source_uri);
-  config->session.proto_version =
-      GetValue(sections, "source", "proto_version", config->session.proto_version);
-  config->session.decode_mode = GetValue(sections, "source", "decode_mode", config->session.decode_mode);
+  FillSourceSessionConfig(sections, &config->session);
   return true;
 }
 
@@ -148,14 +180,28 @@ bool RuntimeConfigLoader::LoadSupervisorAppConfig(const std::string& file_path,
     return false;
   }
 
-  config->session.session_id =
-      GetValue(sections, "supervisor", "session_id", config->session.session_id);
-  config->session.proto_version =
-      GetValue(sections, "supervisor", "proto_version", config->session.proto_version);
-  config->session.control_endpoint =
-      GetValue(sections, "supervisor", "control_endpoint", config->session.control_endpoint);
-
+  FillPhase1DeploymentSpec(sections, &config->deployment);
+  FillSupervisorSessionConfig(sections, &config->session);
   config->deployment.supervisor = config->session;
+  return true;
+}
+
+bool RuntimeConfigLoader::LoadPhase1DeploymentSpec(const std::string& file_path,
+                                                   deployment::Phase1DeploymentSpec* spec,
+                                                   std::string* error) const {
+  if (spec == nullptr) {
+    if (error != nullptr) {
+      *error = "deployment spec output is null";
+    }
+    return false;
+  }
+
+  SectionMap sections;
+  if (!LoadDocument(file_path, &sections, error)) {
+    return false;
+  }
+
+  FillPhase1DeploymentSpec(sections, spec);
   return true;
 }
 
@@ -174,20 +220,8 @@ bool RuntimeConfigLoader::LoadWorkerAppConfig(const std::string& file_path,
     return false;
   }
 
-  config->source.session_id = GetValue(sections, "source", "session_id", config->source.session_id);
-  config->source.source_uri = GetValue(sections, "source", "source_uri", config->source.source_uri);
-  config->source.proto_version = GetValue(sections, "source", "proto_version", config->source.proto_version);
-  config->source.decode_mode = GetValue(sections, "source", "decode_mode", config->source.decode_mode);
-
-  config->worker.session_id = GetValue(sections, "worker", "session_id", config->worker.session_id);
-  config->worker.supervisor_endpoint =
-      GetValue(sections, "worker", "supervisor_endpoint", config->worker.supervisor_endpoint);
-  config->worker.source_session_id =
-      GetValue(sections, "worker", "source_session_id", config->worker.source_session_id);
-  config->worker.proto_version = GetValue(sections, "worker", "proto_version", config->worker.proto_version);
-  config->worker.inference_backend =
-      GetValue(sections, "worker", "inference_backend", config->worker.inference_backend);
-  config->worker.engine_path = GetValue(sections, "worker", "engine_path", config->worker.engine_path);
+  FillSourceSessionConfig(sections, &config->source);
+  FillWorkerSessionConfig(sections, &config->worker);
   return true;
 }
 
