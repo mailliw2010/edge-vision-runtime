@@ -13,6 +13,7 @@ set(CMAKE_CXX_EXTENSIONS OFF)
 set(EVR_RUNTIME_HEADERS
   include/evr/runtime/config/runtime_config_loader.h
   include/evr/runtime/deployment/phase1_deployment.h
+  include/evr/runtime/graph/graph.h
   include/evr/runtime/session/lifecycle_session.h
   include/evr/runtime/session/session_state.h
   include/evr/runtime/source/source_app.h
@@ -25,6 +26,7 @@ set(EVR_RUNTIME_HEADERS
 set(EVR_RUNTIME_SOURCES
   src/config/runtime_config_loader.cpp
   src/deployment/phase1_deployment.cpp
+  src/graph/graph.cpp
   src/session/session_state.cpp
   src/source/source_app.cpp
   src/source/source_session.cpp

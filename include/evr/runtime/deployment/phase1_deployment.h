@@ -2,6 +2,7 @@
 
 #include <string>
 
+#include "evr/runtime/graph/graph.h"
 #include "evr/runtime/session/session_state.h"
 #include "evr/runtime/source/source_session.h"
 #include "evr/runtime/supervisor/supervisor_session.h"
@@ -16,6 +17,7 @@ struct Phase1DeploymentSpec {
   worker::WorkerSessionConfig worker{};
 
   bool Normalize(std::string* error = nullptr);
+  graph::Graph ToGraph() const;
   std::string DescribeWiring() const;
 };
 

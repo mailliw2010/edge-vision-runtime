@@ -4,6 +4,7 @@
 
 #include "evr/runtime/config/runtime_config_loader.h"
 #include "evr/runtime/deployment/phase1_deployment.h"
+#include "evr/runtime/graph/graph.h"
 #include "evr/runtime/source/source_session.h"
 #include "evr/runtime/supervisor/supervisor_session.h"
 #include "evr/runtime/worker/worker_session.h"
@@ -61,14 +62,18 @@ int main() {
   assert(spec.Normalize(&error));
   assert(spec.worker.source_session_id == spec.source.session_id);
   assert(spec.worker.supervisor_endpoint == spec.supervisor.control_endpoint);
-  assert(spec.DescribeWiring().find("worker[worker-test]") != std::string::npos);
+  assert(spec.DescribeWiring().find("edge[phase1-test:source->worker]") != std::string::npos);
+
+  const auto graph = spec.ToGraph();
+  assert(graph.nodes.size() == 3);
+  assert(graph.edges.size() == 2);
 
   evr::runtime::deployment::DeploymentController deployment_controller;
   assert(deployment_controller.Apply(spec, &error));
   const auto status = deployment_controller.GetStatus();
   assert(status.deployment_id == "phase1-test");
   assert(status.state == State::kConfigured);
-  assert(status.wiring.find("supervisor[supervisor-test]") != std::string::npos);
+  assert(status.wiring.find("graph[phase1-test]") != std::string::npos);
 
   const fs::path project_root = fs::path(__FILE__).parent_path().parent_path();
   evr::runtime::config::RuntimeConfigLoader loader;

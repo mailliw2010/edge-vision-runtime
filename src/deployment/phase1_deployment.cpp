@@ -67,9 +67,56 @@ bool Phase1DeploymentSpec::Normalize(std::string* error) {
   return true;
 }
 
+graph::Graph Phase1DeploymentSpec::ToGraph() const {
+  graph::Graph graph;
+  graph.id = deployment_id;
+
+  graph::Node supervisor_node;
+  supervisor_node.id = supervisor.session_id;
+  supervisor_node.type = "supervisor";
+  supervisor_node.name = "runtime-supervisor";
+  supervisor_node.outputs = {"control", "status"};
+  supervisor_node.config_ref = supervisor.control_endpoint;
+
+  graph::Node source_node;
+  source_node.id = source.session_id;
+  source_node.type = "source";
+  source_node.name = "video-source";
+  source_node.outputs = {"frames"};
+  source_node.config_ref = source.source_uri;
+
+  graph::Node worker_node;
+  worker_node.id = worker.session_id;
+  worker_node.type = "worker";
+  worker_node.name = "ai-worker";
+  worker_node.inputs = {"frames"};
+  worker_node.outputs = {"results"};
+  worker_node.config_ref = worker.engine_path;
+
+  graph.nodes = {supervisor_node, source_node, worker_node};
+
+  graph::Edge source_to_worker;
+  source_to_worker.id = deployment_id + ":source->worker";
+  source_to_worker.from_node = source.session_id;
+  source_to_worker.from_port = "frames";
+  source_to_worker.to_node = worker.session_id;
+  source_to_worker.to_port = "frames";
+  source_to_worker.type = "frame";
+
+  graph::Edge supervisor_to_worker;
+  supervisor_to_worker.id = deployment_id + ":supervisor->worker";
+  supervisor_to_worker.from_node = supervisor.session_id;
+  supervisor_to_worker.from_port = "control";
+  supervisor_to_worker.to_node = worker.session_id;
+  supervisor_to_worker.to_port = "control";
+  supervisor_to_worker.type = "control";
+
+  graph.edges = {source_to_worker, supervisor_to_worker};
+  return graph;
+}
+
 std::string Phase1DeploymentSpec::DescribeWiring() const {
-  return "supervisor[" + supervisor.session_id + "] => worker[" + worker.session_id +
-         "] => source[" + source.session_id + "]";
+  return graph::Describe(ToGraph());
 }
 
 bool DeploymentController::Apply(Phase1DeploymentSpec spec, std::string* error) {
