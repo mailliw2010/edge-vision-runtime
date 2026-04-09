@@ -67,6 +67,9 @@ int main() {
   const auto graph = spec.ToGraph();
   assert(graph.nodes.size() == 3);
   assert(graph.edges.size() == 2);
+  const auto json = evr::runtime::graph::ToJson(graph);
+  assert(json.find("\"id\":\"phase1-test\"") != std::string::npos);
+  assert(json.find("\"type\":\"source\"") != std::string::npos);
 
   evr::runtime::deployment::DeploymentController deployment_controller;
   assert(deployment_controller.Apply(spec, &error));

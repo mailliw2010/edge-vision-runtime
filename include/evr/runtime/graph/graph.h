@@ -30,5 +30,6 @@ struct Graph {
 };
 
 std::string Describe(const Graph& graph);
+std::string ToJson(const Graph& graph);
 
 }  // namespace evr::runtime::graph
