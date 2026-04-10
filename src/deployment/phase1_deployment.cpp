@@ -73,14 +73,16 @@ graph::Graph Phase1DeploymentSpec::ToGraph() const {
 
   graph::Node supervisor_node;
   supervisor_node.id = supervisor.session_id;
-  supervisor_node.type = "supervisor";
+  supervisor_node.type = "control";
+  supervisor_node.subtype = "supervisor";
   supervisor_node.name = "runtime-supervisor";
   supervisor_node.outputs = {"control", "status"};
   supervisor_node.config_ref = supervisor.control_endpoint;
 
   graph::Node source_node;
   source_node.id = source.session_id;
-  source_node.type = "source";
+  source_node.type = "media";
+  source_node.subtype = "source";
   source_node.name = "video-source";
   source_node.outputs = {"frames"};
   source_node.config_ref = source.upstream_kind + ":" + source.upstream_endpoint + " -> " +
@@ -88,7 +90,8 @@ graph::Graph Phase1DeploymentSpec::ToGraph() const {
 
   graph::Node worker_node;
   worker_node.id = worker.session_id;
-  worker_node.type = "worker";
+  worker_node.type = "inference";
+  worker_node.subtype = worker.inference_backend;
   worker_node.name = "ai-worker";
   worker_node.inputs = {"frames"};
   worker_node.outputs = {"results"};

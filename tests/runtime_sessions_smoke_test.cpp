@@ -73,7 +73,8 @@ int main() {
   assert(graph.edges.size() == 2);
   const auto json = evr::runtime::graph::ToJson(graph);
   assert(json.find("\"id\":\"phase1-test\"") != std::string::npos);
-  assert(json.find("\"type\":\"source\"") != std::string::npos);
+  assert(json.find("\"type\":\"media\"") != std::string::npos);
+  assert(json.find("\"subtype\":\"source\"") != std::string::npos);
   assert(json.find("events.test") != std::string::npos);
 
   evr::runtime::deployment::DeploymentController deployment_controller;

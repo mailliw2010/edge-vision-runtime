@@ -8,6 +8,7 @@ namespace evr::runtime::graph {
 struct Node {
   std::string id;
   std::string type;
+  std::string subtype;
   std::string name;
   std::vector<std::string> inputs;
   std::vector<std::string> outputs;

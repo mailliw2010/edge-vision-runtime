@@ -38,7 +38,8 @@ std::string Describe(const Graph& graph) {
   std::ostringstream out;
   out << "graph[" << graph.id << "] nodes=" << graph.nodes.size() << " edges=" << graph.edges.size();
   for (const auto& node : graph.nodes) {
-    out << "\n  node[" << node.id << "] type=" << node.type << " name=" << node.name;
+    out << "\n  node[" << node.id << "] type=" << node.type << " subtype=" << node.subtype
+        << " name=" << node.name;
   }
   for (const auto& edge : graph.edges) {
     out << "\n  edge[" << edge.id << "] " << edge.from_node << ":" << edge.from_port
@@ -61,6 +62,7 @@ std::string ToJson(const Graph& graph) {
     out << '{';
     out << "\"id\":\"" << EscapeJson(node.id) << "\",";
     out << "\"type\":\"" << EscapeJson(node.type) << "\",";
+    out << "\"subtype\":\"" << EscapeJson(node.subtype) << "\",";
     out << "\"name\":\"" << EscapeJson(node.name) << "\",";
     out << "\"inputs\":";
     AppendStringArray(out, node.inputs);
