@@ -122,6 +122,7 @@ void FillSourceSessionConfig(const SectionMap& sections, source::SourceSessionCo
   config->source_uri = GetValue(sections, "source", "source_uri", config->source_uri);
   config->proto_version = GetValue(sections, "source", "proto_version", config->proto_version);
   config->decode_mode = GetValue(sections, "source", "decode_mode", config->decode_mode);
+  config->pixel_format = GetValue(sections, "source", "pixel_format", config->pixel_format);
 }
 
 void FillWorkerSessionConfig(const SectionMap& sections, worker::WorkerSessionConfig* config) {
@@ -134,6 +135,9 @@ void FillWorkerSessionConfig(const SectionMap& sections, worker::WorkerSessionCo
   config->inference_backend =
       GetValue(sections, "worker", "inference_backend", config->inference_backend);
   config->engine_path = GetValue(sections, "worker", "engine_path", config->engine_path);
+  config->algorithm_name =
+      GetValue(sections, "worker", "algorithm_name", config->algorithm_name);
+  config->output_topic = GetValue(sections, "worker", "output_topic", config->output_topic);
 }
 
 void FillPhase1DeploymentSpec(const SectionMap& sections,

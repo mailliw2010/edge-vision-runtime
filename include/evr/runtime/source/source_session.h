@@ -12,6 +12,7 @@ struct SourceSessionConfig {
   std::string source_uri{"rtsp://example.local/camera-0"};
   std::string proto_version{"v1"};
   std::string decode_mode{"jetson-nvdec"};
+  std::string pixel_format{"nv12"};
 };
 
 class SourceSession final : public session::LifecycleSession {

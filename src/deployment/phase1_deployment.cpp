@@ -83,7 +83,7 @@ graph::Graph Phase1DeploymentSpec::ToGraph() const {
   source_node.type = "source";
   source_node.name = "video-source";
   source_node.outputs = {"frames"};
-  source_node.config_ref = source.source_uri;
+  source_node.config_ref = source.source_uri + "#" + source.pixel_format;
 
   graph::Node worker_node;
   worker_node.id = worker.session_id;
@@ -91,7 +91,7 @@ graph::Graph Phase1DeploymentSpec::ToGraph() const {
   worker_node.name = "ai-worker";
   worker_node.inputs = {"frames"};
   worker_node.outputs = {"results"};
-  worker_node.config_ref = worker.engine_path;
+  worker_node.config_ref = worker.algorithm_name + "@" + worker.engine_path + " -> " + worker.output_topic;
 
   graph.nodes = {supervisor_node, source_node, worker_node};
 

@@ -14,6 +14,8 @@ struct WorkerSessionConfig {
   std::string proto_version{"v1"};
   std::string inference_backend{"tensorrt"};
   std::string engine_path{"models/detector.plan"};
+  std::string algorithm_name{"detector"};
+  std::string output_topic{"events.detection"};
 };
 
 class WorkerSession final : public session::LifecycleSession {

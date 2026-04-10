@@ -37,7 +37,7 @@ session::Snapshot SourceSession::GetSnapshot() const {
   snapshot.session_id = config_.session_id;
   snapshot.state = state_;
   snapshot.detail = "uri=" + config_.source_uri + ", proto=" + config_.proto_version +
-                    ", decode=" + config_.decode_mode;
+                    ", decode=" + config_.decode_mode + ", pixel=" + config_.pixel_format;
   return snapshot;
 }
 

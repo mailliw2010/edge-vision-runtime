@@ -39,7 +39,8 @@ session::Snapshot WorkerSession::GetSnapshot() const {
   snapshot.detail = "source=" + config_.source_session_id + ", supervisor=" +
                     config_.supervisor_endpoint + ", proto=" + config_.proto_version +
                     ", backend=" + config_.inference_backend + ", engine=" +
-                    config_.engine_path;
+                    config_.engine_path + ", algorithm=" + config_.algorithm_name +
+                    ", output=" + config_.output_topic;
   return snapshot;
 }
 

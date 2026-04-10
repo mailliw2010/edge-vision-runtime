@@ -30,6 +30,7 @@ int main() {
   source_config.source_uri = "rtsp://example.local/test";
   source_config.proto_version = "v1";
   source_config.decode_mode = "jetson-nvdec";
+  source_config.pixel_format = "nv12";
   assert(source_session.Configure(source_config));
   assert(source_session.Start());
   assert(source_session.GetSnapshot().state == State::kRunning);
@@ -44,6 +45,8 @@ int main() {
   worker_config.proto_version = "v1";
   worker_config.inference_backend = "tensorrt";
   worker_config.engine_path = "models/test.plan";
+  worker_config.algorithm_name = "detector";
+  worker_config.output_topic = "events.test";
   assert(worker_session.Configure(worker_config));
   assert(worker_session.Start());
   assert(worker_session.GetSnapshot().state == State::kRunning);
@@ -70,6 +73,7 @@ int main() {
   const auto json = evr::runtime::graph::ToJson(graph);
   assert(json.find("\"id\":\"phase1-test\"") != std::string::npos);
   assert(json.find("\"type\":\"source\"") != std::string::npos);
+  assert(json.find("events.test") != std::string::npos);
 
   evr::runtime::deployment::DeploymentController deployment_controller;
   assert(deployment_controller.Apply(spec, &error));
@@ -86,6 +90,7 @@ int main() {
                                     &loaded_source_config, &error));
   assert(loaded_source_config.session.session_id == "source-demo");
   assert(loaded_source_config.session.decode_mode == "jetson-nvdec");
+  assert(loaded_source_config.session.pixel_format == "nv12");
 
   evr::runtime::supervisor::SupervisorAppConfig loaded_supervisor_config;
   assert(loader.LoadSupervisorAppConfig(
@@ -112,6 +117,8 @@ int main() {
                                     &loaded_worker_config, &error));
   assert(loaded_worker_config.source.session_id == "source-demo");
   assert(loaded_worker_config.worker.session_id == "worker-0");
+  assert(loaded_worker_config.worker.algorithm_name == "detector");
+  assert(loaded_worker_config.worker.output_topic == "events.detection");
   assert(loaded_worker_config.worker.supervisor_endpoint ==
          "unix:///tmp/evr-supervisor.sock");
 

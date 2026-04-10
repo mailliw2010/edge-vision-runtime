@@ -3,6 +3,7 @@ source:
   source_uri: rtsp://example.local/camera-0
   proto_version: v1
   decode_mode: jetson-nvdec
+  pixel_format: nv12
 
 worker:
   session_id: worker-0
@@ -11,3 +12,5 @@ worker:
   proto_version: v1
   inference_backend: tensorrt
   engine_path: models/detector.plan
+  algorithm_name: detector
+  output_topic: events.detection
