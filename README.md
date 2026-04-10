@@ -1,11 +1,38 @@
 # edge-vision-runtime
 
-C++ Runtime 仓，当前先对齐**第一阶段最小闭环**：
+C++ Runtime 仓，当前聚焦**真实最小业务闭环**的运行时承载。
 
-- Jetson / TensorRT 优先
-- proto 先冻结 `v1` 骨架
-- 先把 supervisor / worker / source 的 app/session 边界搭出来
-- 这版刻意不做重实现，不引入真实解码、IPC、TensorRT 细节
+## 当前口径
+
+当前最小业务闭环按以下真实架构收敛：
+
+- ZLMediaKit：流媒体入口 / 代理 / 多路流前置能力
+- SourceSession：承接来自 ZLM 或直接流源的视频输入
+- GStreamer / DeepStream：解码与媒体处理链
+- Worker：承接本机推理调用
+- 本机推理：FastDeploy 或直接 TensorRT
+- Supervisor：负责编排 Source / Worker / graph / deployment 状态
+
+当前阶段，runtime 已经开始同时维护：
+
+- YAML：用户侧/部署侧入口配置
+- JSON graph：内部 DAG / pipeline 表达
+- C++ 对象模型：真正执行时的运行时承载
+
+## 当前职责
+
+本仓在最小闭环里负责：
+
+- 承接 deployment 到 graph 的映射
+- 承接 source / worker / supervisor 的运行时语义
+- 表达视频流、算法节点、输出主题的最小业务链
+- 为后续接入 ZLM、GStreamer/DeepStream、FastDeploy/TensorRT 预留稳定边界
+
+本仓当前不负责：
+
+- 前端页面
+- 控制面业务编排真相源
+- 跨仓 REST / gRPC 契约定义
 
 ## 当前骨架
 
