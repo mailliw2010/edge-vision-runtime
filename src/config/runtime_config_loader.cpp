@@ -120,6 +120,9 @@ void FillSupervisorSessionConfig(const SectionMap& sections,
 void FillSourceSessionConfig(const SectionMap& sections, source::SourceSessionConfig* config) {
   config->session_id = GetValue(sections, "source", "session_id", config->session_id);
   config->source_uri = GetValue(sections, "source", "source_uri", config->source_uri);
+  config->upstream_kind = GetValue(sections, "source", "upstream_kind", config->upstream_kind);
+  config->upstream_endpoint =
+      GetValue(sections, "source", "upstream_endpoint", config->upstream_endpoint);
   config->proto_version = GetValue(sections, "source", "proto_version", config->proto_version);
   config->decode_mode = GetValue(sections, "source", "decode_mode", config->decode_mode);
   config->pixel_format = GetValue(sections, "source", "pixel_format", config->pixel_format);

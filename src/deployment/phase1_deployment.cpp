@@ -83,7 +83,8 @@ graph::Graph Phase1DeploymentSpec::ToGraph() const {
   source_node.type = "source";
   source_node.name = "video-source";
   source_node.outputs = {"frames"};
-  source_node.config_ref = source.source_uri + "#" + source.pixel_format;
+  source_node.config_ref = source.upstream_kind + ":" + source.upstream_endpoint + " -> " +
+                           source.source_uri + "#" + source.pixel_format;
 
   graph::Node worker_node;
   worker_node.id = worker.session_id;

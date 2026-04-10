@@ -10,6 +10,8 @@ namespace evr::runtime::source {
 struct SourceSessionConfig {
   std::string session_id{"source-demo"};
   std::string source_uri{"rtsp://example.local/camera-0"};
+  std::string upstream_kind{"direct-rtsp"};
+  std::string upstream_endpoint{""};
   std::string proto_version{"v1"};
   std::string decode_mode{"jetson-nvdec"};
   std::string pixel_format{"nv12"};

@@ -27,7 +27,8 @@ int main() {
   evr::runtime::source::SourceSession source_session;
   evr::runtime::source::SourceSessionConfig source_config;
   source_config.session_id = "source-test";
-  source_config.source_uri = "rtsp://example.local/test";
+  source_config.upstream_kind = "zlm-proxy";
+  source_config.upstream_endpoint = "rtsp://127.0.0.1:554/camera-0";
   source_config.proto_version = "v1";
   source_config.decode_mode = "jetson-nvdec";
   source_config.pixel_format = "nv12";

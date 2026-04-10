@@ -1,5 +1,8 @@
 source:
   session_id: source-demo
-  source_uri: rtsp://example.local/camera-0
+  source_uri: rtsp://127.0.0.1:8554/live/camera-0
+  upstream_kind: zlm-proxy
+  upstream_endpoint: rtsp://127.0.0.1:554/camera-0
   proto_version: v1
   decode_mode: jetson-nvdec
+  pixel_format: nv12
