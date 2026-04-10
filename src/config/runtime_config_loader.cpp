@@ -123,6 +123,8 @@ void FillSourceSessionConfig(const SectionMap& sections, source::SourceSessionCo
   config->upstream_kind = GetValue(sections, "source", "upstream_kind", config->upstream_kind);
   config->upstream_endpoint =
       GetValue(sections, "source", "upstream_endpoint", config->upstream_endpoint);
+  config->transport_protocol =
+      GetValue(sections, "source", "transport_protocol", config->transport_protocol);
   config->proto_version = GetValue(sections, "source", "proto_version", config->proto_version);
   config->decode_mode = GetValue(sections, "source", "decode_mode", config->decode_mode);
   config->pixel_format = GetValue(sections, "source", "pixel_format", config->pixel_format);
@@ -140,6 +142,7 @@ void FillWorkerSessionConfig(const SectionMap& sections, worker::WorkerSessionCo
   config->engine_path = GetValue(sections, "worker", "engine_path", config->engine_path);
   config->algorithm_name =
       GetValue(sections, "worker", "algorithm_name", config->algorithm_name);
+  config->input_binding = GetValue(sections, "worker", "input_binding", config->input_binding);
   config->output_topic = GetValue(sections, "worker", "output_topic", config->output_topic);
 }
 

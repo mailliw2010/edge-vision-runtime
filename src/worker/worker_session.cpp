@@ -40,7 +40,7 @@ session::Snapshot WorkerSession::GetSnapshot() const {
                     config_.supervisor_endpoint + ", proto=" + config_.proto_version +
                     ", backend=" + config_.inference_backend + ", engine=" +
                     config_.engine_path + ", algorithm=" + config_.algorithm_name +
-                    ", output=" + config_.output_topic;
+                    ", input=" + config_.input_binding + ", output=" + config_.output_topic;
   return snapshot;
 }
 

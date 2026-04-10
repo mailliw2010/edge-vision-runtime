@@ -12,6 +12,7 @@ struct SourceSessionConfig {
   std::string source_uri{"rtsp://example.local/camera-0"};
   std::string upstream_kind{"direct-rtsp"};
   std::string upstream_endpoint{""};
+  std::string transport_protocol{"rtsp"};
   std::string proto_version{"v1"};
   std::string decode_mode{"jetson-nvdec"};
   std::string pixel_format{"nv12"};
