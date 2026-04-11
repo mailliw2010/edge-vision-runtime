@@ -85,8 +85,11 @@ graph::Graph Phase1DeploymentSpec::ToGraph() const {
   source_node.subtype = "source";
   source_node.name = "video-source";
   source_node.outputs = {"frames"};
-  source_node.config_ref = source.upstream_kind + ":" + source.upstream_endpoint + " -> " +
-                           source.source_uri + "#" + source.pixel_format;
+  source_node.config_ref = "{\"upstream_kind\":\"" + source.upstream_kind +
+                           "\",\"upstream_endpoint\":\"" + source.upstream_endpoint +
+                           "\",\"source_uri\":\"" + source.source_uri +
+                           "\",\"transport_protocol\":\"" + source.transport_protocol +
+                           "\",\"pixel_format\":\"" + source.pixel_format + "\"}";
 
   graph::Node worker_node;
   worker_node.id = worker.session_id;
@@ -95,7 +98,11 @@ graph::Graph Phase1DeploymentSpec::ToGraph() const {
   worker_node.name = "ai-worker";
   worker_node.inputs = {"frames"};
   worker_node.outputs = {"results"};
-  worker_node.config_ref = worker.algorithm_name + "@" + worker.engine_path + " -> " + worker.output_topic;
+  worker_node.config_ref = "{\"algorithm_name\":\"" + worker.algorithm_name +
+                           "\",\"engine_path\":\"" + worker.engine_path +
+                           "\",\"input_binding\":\"" + worker.input_binding +
+                           "\",\"output_topic\":\"" + worker.output_topic +
+                           "\",\"backend\":\"" + worker.inference_backend + "\"}";
 
   graph::Node sink_node;
   sink_node.id = deployment_id + ":sink";
@@ -103,7 +110,7 @@ graph::Graph Phase1DeploymentSpec::ToGraph() const {
   sink_node.subtype = "event-topic";
   sink_node.name = "result-sink";
   sink_node.inputs = {"results"};
-  sink_node.config_ref = worker.output_topic;
+  sink_node.config_ref = "{\"output_topic\":\"" + worker.output_topic + "\"}";
 
   graph.nodes = {supervisor_node, source_node, worker_node, sink_node};
 

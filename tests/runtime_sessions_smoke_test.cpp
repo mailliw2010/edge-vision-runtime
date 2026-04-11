@@ -77,8 +77,8 @@ int main() {
   assert(json.find("\"id\":\"phase1-test\"") != std::string::npos);
   assert(json.find("\"type\":\"media\"") != std::string::npos);
   assert(json.find("\"subtype\":\"source\"") != std::string::npos);
-  assert(json.find("\"type\":\"output\"") != std::string::npos);
   assert(json.find("events.test") != std::string::npos);
+  assert(json.find("\"type\":\"output\"") != std::string::npos);
 
   evr::runtime::deployment::DeploymentController deployment_controller;
   assert(deployment_controller.Apply(spec, &error));
