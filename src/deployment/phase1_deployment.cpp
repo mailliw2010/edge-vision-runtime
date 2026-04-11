@@ -97,7 +97,15 @@ graph::Graph Phase1DeploymentSpec::ToGraph() const {
   worker_node.outputs = {"results"};
   worker_node.config_ref = worker.algorithm_name + "@" + worker.engine_path + " -> " + worker.output_topic;
 
-  graph.nodes = {supervisor_node, source_node, worker_node};
+  graph::Node sink_node;
+  sink_node.id = deployment_id + ":sink";
+  sink_node.type = "output";
+  sink_node.subtype = "event-topic";
+  sink_node.name = "result-sink";
+  sink_node.inputs = {"results"};
+  sink_node.config_ref = worker.output_topic;
+
+  graph.nodes = {supervisor_node, source_node, worker_node, sink_node};
 
   graph::Edge source_to_worker;
   source_to_worker.id = deployment_id + ":source->worker";
@@ -115,7 +123,15 @@ graph::Graph Phase1DeploymentSpec::ToGraph() const {
   supervisor_to_worker.to_port = "control";
   supervisor_to_worker.type = "control";
 
-  graph.edges = {source_to_worker, supervisor_to_worker};
+  graph::Edge worker_to_sink;
+  worker_to_sink.id = deployment_id + ":worker->sink";
+  worker_to_sink.from_node = worker.session_id;
+  worker_to_sink.from_port = "results";
+  worker_to_sink.to_node = sink_node.id;
+  worker_to_sink.to_port = "results";
+  worker_to_sink.type = "event";
+
+  graph.edges = {source_to_worker, supervisor_to_worker, worker_to_sink};
   return graph;
 }
 

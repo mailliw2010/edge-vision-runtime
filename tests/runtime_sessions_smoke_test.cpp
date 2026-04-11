@@ -71,12 +71,13 @@ int main() {
   assert(spec.DescribeWiring().find("edge[phase1-test:source->worker]") != std::string::npos);
 
   const auto graph = spec.ToGraph();
-  assert(graph.nodes.size() == 3);
-  assert(graph.edges.size() == 2);
+  assert(graph.nodes.size() == 4);
+  assert(graph.edges.size() == 3);
   const auto json = evr::runtime::graph::ToJson(graph);
   assert(json.find("\"id\":\"phase1-test\"") != std::string::npos);
   assert(json.find("\"type\":\"media\"") != std::string::npos);
   assert(json.find("\"subtype\":\"source\"") != std::string::npos);
+  assert(json.find("\"type\":\"output\"") != std::string::npos);
   assert(json.find("events.test") != std::string::npos);
 
   evr::runtime::deployment::DeploymentController deployment_controller;
