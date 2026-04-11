@@ -16,6 +16,7 @@ struct WorkerSessionConfig {
   std::string engine_path{"models/detector.plan"};
   std::string algorithm_name{"detector"};
   std::string input_binding{"frames"};
+  std::string result_encoding{"json"};
   std::string output_topic{"events.detection"};
 };
 

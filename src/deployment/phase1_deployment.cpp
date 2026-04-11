@@ -89,6 +89,7 @@ graph::Graph Phase1DeploymentSpec::ToGraph() const {
                            "\",\"upstream_endpoint\":\"" + source.upstream_endpoint +
                            "\",\"source_uri\":\"" + source.source_uri +
                            "\",\"transport_protocol\":\"" + source.transport_protocol +
+                           "\",\"buffer_transport\":\"" + source.buffer_transport +
                            "\",\"pixel_format\":\"" + source.pixel_format + "\"}";
 
   graph::Node worker_node;
@@ -101,6 +102,7 @@ graph::Graph Phase1DeploymentSpec::ToGraph() const {
   worker_node.config_ref = "{\"algorithm_name\":\"" + worker.algorithm_name +
                            "\",\"engine_path\":\"" + worker.engine_path +
                            "\",\"input_binding\":\"" + worker.input_binding +
+                           "\",\"result_encoding\":\"" + worker.result_encoding +
                            "\",\"output_topic\":\"" + worker.output_topic +
                            "\",\"backend\":\"" + worker.inference_backend + "\"}";
 

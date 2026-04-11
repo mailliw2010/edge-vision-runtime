@@ -13,6 +13,7 @@ struct SourceSessionConfig {
   std::string upstream_kind{"direct-rtsp"};
   std::string upstream_endpoint{""};
   std::string transport_protocol{"rtsp"};
+  std::string buffer_transport{"nvmm"};
   std::string proto_version{"v1"};
   std::string decode_mode{"jetson-nvdec"};
   std::string pixel_format{"nv12"};

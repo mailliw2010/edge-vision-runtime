@@ -4,6 +4,7 @@ source:
   upstream_kind: zlm-proxy
   upstream_endpoint: rtsp://127.0.0.1:554/camera-0
   transport_protocol: rtsp
+  buffer_transport: nvmm
   proto_version: v1
   decode_mode: jetson-nvdec
   pixel_format: nv12
@@ -17,4 +18,5 @@ worker:
   engine_path: models/detector.plan
   algorithm_name: detector
   input_binding: frames
+  result_encoding: json
   output_topic: events.detection

@@ -30,6 +30,7 @@ int main() {
   source_config.upstream_kind = "zlm-proxy";
   source_config.upstream_endpoint = "rtsp://127.0.0.1:554/camera-0";
   source_config.transport_protocol = "rtsp";
+  source_config.buffer_transport = "nvmm";
   source_config.proto_version = "v1";
   source_config.decode_mode = "jetson-nvdec";
   source_config.pixel_format = "nv12";
@@ -49,6 +50,7 @@ int main() {
   worker_config.engine_path = "models/test.plan";
   worker_config.algorithm_name = "detector";
   worker_config.input_binding = "frames";
+  worker_config.result_encoding = "json";
   worker_config.output_topic = "events.test";
   assert(worker_session.Configure(worker_config));
   assert(worker_session.Start());
@@ -96,6 +98,7 @@ int main() {
   assert(loaded_source_config.session.session_id == "source-demo");
   assert(loaded_source_config.session.decode_mode == "jetson-nvdec");
   assert(loaded_source_config.session.transport_protocol == "rtsp");
+  assert(loaded_source_config.session.buffer_transport == "nvmm");
   assert(loaded_source_config.session.pixel_format == "nv12");
 
   evr::runtime::supervisor::SupervisorAppConfig loaded_supervisor_config;
@@ -125,6 +128,7 @@ int main() {
   assert(loaded_worker_config.worker.session_id == "worker-0");
   assert(loaded_worker_config.worker.algorithm_name == "detector");
   assert(loaded_worker_config.worker.input_binding == "frames");
+  assert(loaded_worker_config.worker.result_encoding == "json");
   assert(loaded_worker_config.worker.output_topic == "events.detection");
   assert(loaded_worker_config.worker.supervisor_endpoint ==
          "unix:///tmp/evr-supervisor.sock");
