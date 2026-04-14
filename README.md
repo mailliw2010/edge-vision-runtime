@@ -10,7 +10,7 @@ C++ Runtime 仓，当前聚焦**真实最小业务闭环**的运行时承载。
 - SourceSession：承接来自 ZLM 或直接流源的视频输入
 - GStreamer / DeepStream：解码与媒体处理链
 - Worker：承接本机推理调用
-- 本机推理：FastDeploy 或直接 TensorRT
+- 本机推理：**当前最小闭环优先 TensorRT**
 - Supervisor：负责编排 Source / Worker / graph / deployment 状态
 
 当前阶段，runtime 已经开始同时维护：
@@ -26,7 +26,7 @@ C++ Runtime 仓，当前聚焦**真实最小业务闭环**的运行时承载。
 - 承接 deployment 到 graph 的映射
 - 承接 source / worker / supervisor 的运行时语义
 - 表达视频流、算法节点、输出主题的最小业务链
-- 为后续接入 ZLM、GStreamer/DeepStream、FastDeploy/TensorRT 预留稳定边界
+- 为后续接入 ZLM、GStreamer/DeepStream、TensorRT 预留稳定边界
 
 本仓当前不负责：
 
