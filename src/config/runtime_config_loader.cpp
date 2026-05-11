@@ -144,6 +144,12 @@ void FillWorkerSessionConfig(const SectionMap& sections, worker::WorkerSessionCo
   config->engine_path = GetValue(sections, "worker", "engine_path", config->engine_path);
   config->algorithm_name =
       GetValue(sections, "worker", "algorithm_name", config->algorithm_name);
+  config->algorithm_package_uri =
+      GetValue(sections, "worker", "algorithm_package_uri", config->algorithm_package_uri);
+  config->algorithm_entry_point =
+      GetValue(sections, "worker", "algorithm_entry_point", config->algorithm_entry_point);
+  config->algorithm_runtime_config_uri =
+      GetValue(sections, "worker", "algorithm_runtime_config_uri", config->algorithm_runtime_config_uri);
   config->input_binding = GetValue(sections, "worker", "input_binding", config->input_binding);
   config->result_encoding =
       GetValue(sections, "worker", "result_encoding", config->result_encoding);

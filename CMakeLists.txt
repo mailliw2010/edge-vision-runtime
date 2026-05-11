@@ -40,6 +40,7 @@ function(evr_apply_common_settings target)
   target_include_directories(${target}
     PUBLIC
       $<BUILD_INTERFACE:${PROJECT_SOURCE_DIR}/include>
+      $<BUILD_INTERFACE:${PROJECT_SOURCE_DIR}/algorithm/yolov8_person_detection/include>
       $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}>)
 
   if(MSVC)
@@ -54,6 +55,8 @@ add_library(evr_runtime STATIC
   ${EVR_RUNTIME_SOURCES})
 add_library(evr::runtime ALIAS evr_runtime)
 
+target_link_libraries(evr_runtime PRIVATE evr::yolov8_person_detection)
+
 evr_apply_common_settings(evr_runtime)
 set_target_properties(evr_runtime PROPERTIES
   OUTPUT_NAME evr_runtime
@@ -61,11 +64,13 @@ set_target_properties(evr_runtime PROPERTIES
 
 function(evr_add_runtime_binary target source_file)
   add_executable(${target} ${source_file})
-  target_link_libraries(${target} PRIVATE evr::runtime)
+  target_link_libraries(${target} PRIVATE evr::runtime evr::yolov8_person_detection)
   evr_apply_common_settings(${target})
   set_target_properties(${target} PROPERTIES
     RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin)
 endfunction()
+
+add_subdirectory(algorithm/yolov8_person_detection)
 
 evr_add_runtime_binary(runtime-supervisor cmd/runtime-supervisor/main.cpp)
 evr_add_runtime_binary(runtime-source cmd/runtime-source/main.cpp)
@@ -83,16 +88,72 @@ if(EVR_ENABLE_INSTALL)
 endif()
 
 if(BUILD_TESTING)
+  set(EVR_YOLOV8_PERSON_DETECTION_DIR
+    "${PROJECT_SOURCE_DIR}/algorithm/yolov8_person_detection")
+  set(EVR_YOLOV8_MODEL_PATH
+    "${PROJECT_SOURCE_DIR}/tests/fixtures/readable-yolov8s.model")
+  set(EVR_YOLOV8_RUNTIME_CONFIG_PATH
+    "${EVR_YOLOV8_PERSON_DETECTION_DIR}/configs/yolov8_person_detection.v1.example.yaml")
+
   add_executable(runtime_sessions_smoke_test tests/runtime_sessions_smoke_test.cpp)
-  target_link_libraries(runtime_sessions_smoke_test PRIVATE evr::runtime)
+  target_link_libraries(runtime_sessions_smoke_test PRIVATE evr::runtime evr::yolov8_person_detection)
   evr_apply_common_settings(runtime_sessions_smoke_test)
   add_test(NAME runtime_sessions_smoke_test COMMAND runtime_sessions_smoke_test)
+
+  add_executable(runtime_worker_algorithm_loading_smoke_test tests/runtime_worker_algorithm_loading_smoke_test.cpp)
+  target_link_libraries(runtime_worker_algorithm_loading_smoke_test PRIVATE evr::yolov8_person_detection)
+  evr_apply_common_settings(runtime_worker_algorithm_loading_smoke_test)
+  target_compile_definitions(runtime_worker_algorithm_loading_smoke_test
+    PRIVATE "EVR_TEST_YOLOV8S_MODEL_PATH=\"${EVR_YOLOV8_MODEL_PATH}\"")
+  add_test(NAME runtime_worker_algorithm_loading_smoke_test COMMAND runtime_worker_algorithm_loading_smoke_test)
+
+  add_executable(runtime_video_detect_result_smoke_test tests/runtime_video_detect_result_smoke_test.cpp)
+  target_link_libraries(runtime_video_detect_result_smoke_test
+    PRIVATE evr::runtime evr::yolov8_person_detection)
+  evr_apply_common_settings(runtime_video_detect_result_smoke_test)
+  target_compile_definitions(runtime_video_detect_result_smoke_test
+    PRIVATE "EVR_TEST_YOLOV8S_MODEL_PATH=\"${EVR_YOLOV8_MODEL_PATH}\"")
+  add_test(NAME runtime_video_detect_result_smoke_test COMMAND runtime_video_detect_result_smoke_test)
+
+  add_executable(runtime_file_video_detect_result_smoke_test
+    tests/runtime_file_video_detect_result_smoke_test.cpp)
+  target_link_libraries(runtime_file_video_detect_result_smoke_test
+    PRIVATE evr::yolov8_person_detection)
+  evr_apply_common_settings(runtime_file_video_detect_result_smoke_test)
+  target_compile_definitions(runtime_file_video_detect_result_smoke_test
+    PRIVATE "EVR_TEST_YOLOV8S_MODEL_PATH=\"${EVR_YOLOV8_MODEL_PATH}\"")
+  add_test(NAME runtime_file_video_detect_result_smoke_test
+    COMMAND runtime_file_video_detect_result_smoke_test)
+  set_tests_properties(runtime_file_video_detect_result_smoke_test
+    PROPERTIES SKIP_RETURN_CODE 77)
+
+  add_executable(runtime_rtsp_video_detect_result_smoke_test
+    tests/runtime_rtsp_video_detect_result_smoke_test.cpp)
+  target_link_libraries(runtime_rtsp_video_detect_result_smoke_test
+    PRIVATE evr::yolov8_person_detection)
+  evr_apply_common_settings(runtime_rtsp_video_detect_result_smoke_test)
+  target_compile_definitions(runtime_rtsp_video_detect_result_smoke_test
+    PRIVATE "EVR_TEST_YOLOV8S_MODEL_PATH=\"${EVR_YOLOV8_MODEL_PATH}\"")
+  add_test(NAME runtime_rtsp_video_detect_result_smoke_test
+    COMMAND runtime_rtsp_video_detect_result_smoke_test)
+  set_tests_properties(runtime_rtsp_video_detect_result_smoke_test
+    PROPERTIES SKIP_RETURN_CODE 77 TIMEOUT 30)
+
+  add_test(NAME runtime_zlm_video_detect_result_smoke_test
+    COMMAND runtime_rtsp_video_detect_result_smoke_test EVR_TEST_ZLM_RTSP_URI zlm)
+  set_tests_properties(runtime_zlm_video_detect_result_smoke_test
+    PROPERTIES SKIP_RETURN_CODE 77 TIMEOUT 30)
+
   add_test(NAME runtime_source_cli_smoke_test
     COMMAND $<TARGET_FILE:runtime-source> --config
             ${PROJECT_SOURCE_DIR}/configs/runtime-source.v1.example.yaml)
   add_test(NAME runtime_worker_cli_smoke_test
     COMMAND $<TARGET_FILE:runtime-worker> --config
-            ${PROJECT_SOURCE_DIR}/configs/runtime-worker.v1.example.yaml)
+            ${PROJECT_SOURCE_DIR}/configs/runtime-worker.v1.example.yaml
+            --engine-path=${EVR_YOLOV8_MODEL_PATH}
+            --algorithm-package-uri=file://${EVR_YOLOV8_PERSON_DETECTION_DIR}
+            --algorithm-entry-point=evr::algorithm::yolov8_person_detection::YoloV8PersonDetector
+            --algorithm-runtime-config-uri=file://${EVR_YOLOV8_RUNTIME_CONFIG_PATH})
   add_test(NAME runtime_supervisor_apply_cli_smoke_test
     COMMAND $<TARGET_FILE:runtime-supervisor> apply --config
             ${PROJECT_SOURCE_DIR}/configs/runtime-phase1-deployment.v1.example.yaml)

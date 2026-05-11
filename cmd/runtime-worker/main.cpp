@@ -1,6 +1,7 @@
 #include "evr/runtime/worker/worker_app.h"
 
 #include <iostream>
+#include <stdexcept>
 #include <string>
 
 #include "evr/runtime/config/runtime_config_loader.h"
@@ -28,6 +29,19 @@ struct WorkerCliOptions {
   std::string inference_backend;
   bool has_engine_path{false};
   std::string engine_path;
+  bool has_algorithm_package_uri{false};
+  std::string algorithm_package_uri;
+  bool has_algorithm_entry_point{false};
+  std::string algorithm_entry_point;
+  bool has_algorithm_runtime_config_uri{false};
+  std::string algorithm_runtime_config_uri;
+  bool decode_source_frames{false};
+  bool has_frame_width{false};
+  std::string frame_width;
+  bool has_frame_height{false};
+  std::string frame_height;
+  bool has_frame_count{false};
+  std::string frame_count;
 };
 
 bool AssignOptionValue(const std::string& argument,
@@ -124,6 +138,47 @@ bool ParseArgs(int argc, char** argv, WorkerCliOptions* options, std::string* er
       continue;
     }
 
+    if (AssignOptionValue(argument, "--algorithm-package-uri", argc, argv, &index,
+                          &options->algorithm_package_uri, error)) {
+      options->has_algorithm_package_uri = true;
+      continue;
+    }
+
+    if (AssignOptionValue(argument, "--algorithm-entry-point", argc, argv, &index,
+                          &options->algorithm_entry_point, error)) {
+      options->has_algorithm_entry_point = true;
+      continue;
+    }
+
+    if (AssignOptionValue(argument, "--algorithm-runtime-config-uri", argc, argv, &index,
+                          &options->algorithm_runtime_config_uri, error)) {
+      options->has_algorithm_runtime_config_uri = true;
+      continue;
+    }
+
+    if (argument == "--decode-source-frames") {
+      options->decode_source_frames = true;
+      continue;
+    }
+
+    if (AssignOptionValue(argument, "--frame-width", argc, argv, &index, &options->frame_width,
+                          error)) {
+      options->has_frame_width = true;
+      continue;
+    }
+
+    if (AssignOptionValue(argument, "--frame-height", argc, argv, &index, &options->frame_height,
+                          error)) {
+      options->has_frame_height = true;
+      continue;
+    }
+
+    if (AssignOptionValue(argument, "--frame-count", argc, argv, &index, &options->frame_count,
+                          error)) {
+      options->has_frame_count = true;
+      continue;
+    }
+
     *error = "unknown argument: " + argument;
     return false;
   }
@@ -135,7 +190,10 @@ void PrintUsage() {
   std::cout << "Usage: runtime-worker [run] [--config FILE] [--source-session-id ID] "
                "[--source-uri URI] [--decode-mode MODE] [--worker-session-id ID] "
                "[--worker-source-session-id ID] [--supervisor-endpoint URI] "
-               "[--proto-version VERSION] [--inference-backend NAME] [--engine-path PATH]\n";
+               "[--proto-version VERSION] [--inference-backend NAME] [--engine-path PATH] "
+               "[--algorithm-package-uri URI] [--algorithm-entry-point SYMBOL] "
+               "[--algorithm-runtime-config-uri URI] [--decode-source-frames] "
+               "[--frame-width WIDTH] [--frame-height HEIGHT] [--frame-count COUNT]\n";
 }
 
 }  // namespace
@@ -196,6 +254,42 @@ int main(int argc, char** argv) {
 
   if (options.has_engine_path) {
     config.worker.engine_path = options.engine_path;
+  }
+
+  if (options.has_algorithm_package_uri) {
+    config.algorithm.package_uri = options.algorithm_package_uri;
+    config.worker.algorithm_package_uri = options.algorithm_package_uri;
+  }
+
+  if (options.has_algorithm_entry_point) {
+    config.algorithm.entry_point = options.algorithm_entry_point;
+    config.worker.algorithm_entry_point = options.algorithm_entry_point;
+  }
+
+  if (options.has_algorithm_runtime_config_uri) {
+    config.algorithm.runtime_config_uri = options.algorithm_runtime_config_uri;
+    config.worker.algorithm_runtime_config_uri = options.algorithm_runtime_config_uri;
+  }
+
+  config.decode_source_frames = options.decode_source_frames;
+  try {
+    if (options.has_frame_width) {
+      config.source_frame_width = std::stoi(options.frame_width);
+    }
+    if (options.has_frame_height) {
+      config.source_frame_height = std::stoi(options.frame_height);
+    }
+    if (options.has_frame_count) {
+      config.source_frame_count = std::stoi(options.frame_count);
+    }
+  } catch (const std::exception& ex) {
+    std::cerr << "invalid frame option: " << ex.what() << '\n';
+    return 1;
+  }
+  if (config.source_frame_width <= 0 || config.source_frame_height <= 0 ||
+      config.source_frame_count <= 0) {
+    std::cerr << "frame width, height, and count must be positive\n";
+    return 1;
   }
 
   if (options.has_source_session_id && !options.has_worker_source_session_id) {

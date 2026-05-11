@@ -1,0 +1,10 @@
+algorithm:
+  name: yolov8-person-detection
+  backend: onnxruntime
+  model_path: models/yolov8s.onnx
+  input_width: 640
+  input_height: 640
+  confidence_threshold: 0.25
+  nms_threshold: 0.45
+  classes:
+    - person

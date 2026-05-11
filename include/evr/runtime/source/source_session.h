@@ -1,7 +1,9 @@
 #pragma once
 
+#include <cstdint>
 #include <string>
 #include <string_view>
+#include <vector>
 
 #include "evr/runtime/session/lifecycle_session.h"
 
@@ -19,6 +21,12 @@ struct SourceSessionConfig {
   std::string pixel_format{"nv12"};
 };
 
+struct FrameBuffer {
+  int width{0};
+  int height{0};
+  std::vector<std::uint8_t> rgba;
+};
+
 class SourceSession final : public session::LifecycleSession {
  public:
   bool Configure(const SourceSessionConfig& config);
@@ -28,6 +36,12 @@ class SourceSession final : public session::LifecycleSession {
   bool Start() override;
   void Stop() override;
   session::Snapshot GetSnapshot() const override;
+
+  FrameBuffer MakeSyntheticFrame(int width, int height) const;
+  std::vector<FrameBuffer> CaptureFramesFromSource(int width,
+                                                   int height,
+                                                   int frame_count,
+                                                   std::string* error) const;
 
  private:
   SourceSessionConfig config_{};

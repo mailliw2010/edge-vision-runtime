@@ -5,3 +5,27 @@
 *.a
 *.so
 *.log
+
+# Local build and package artifacts.
+cmake-build-*/
+out/
+dist/
+*.dll
+*.dylib
+*.exe
+*.bin
+*.tar
+*.tar.gz
+*.tgz
+*.zip
+*.7z
+*.rar
+
+# Large model/runtime artifacts should come from artifact storage or Git LFS.
+models/
+*.onnx
+*.engine
+*.plan
+*.pt
+*.pth
+*.weights

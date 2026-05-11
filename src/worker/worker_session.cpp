@@ -40,8 +40,11 @@ session::Snapshot WorkerSession::GetSnapshot() const {
                     config_.supervisor_endpoint + ", proto=" + config_.proto_version +
                     ", backend=" + config_.inference_backend + ", engine=" +
                     config_.engine_path + ", algorithm=" + config_.algorithm_name +
-                    ", input=" + config_.input_binding + ", encoding=" +
-                    config_.result_encoding + ", output=" + config_.output_topic;
+                    ", package=" + config_.algorithm_package_uri + ", entry=" +
+                    config_.algorithm_entry_point + ", runtime_config=" +
+                    config_.algorithm_runtime_config_uri + ", input=" + config_.input_binding +
+                    ", encoding=" + config_.result_encoding + ", output=" + config_.output_topic +
+                    ", model=" + config_.engine_path;
   return snapshot;
 }
 

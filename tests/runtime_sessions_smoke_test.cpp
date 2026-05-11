@@ -47,8 +47,11 @@ int main() {
   worker_config.source_session_id = "source-test";
   worker_config.proto_version = "v1";
   worker_config.inference_backend = "tensorrt";
-  worker_config.engine_path = "models/test.plan";
-  worker_config.algorithm_name = "detector";
+  worker_config.engine_path = "models/yolov8s.onnx";
+  worker_config.algorithm_name = "yolov8-person-detection";
+  worker_config.algorithm_package_uri = "algorithm/yolov8_person_detection";
+  worker_config.algorithm_entry_point = "evr::algorithm::yolov8_person_detection::YoloV8PersonDetector";
+  worker_config.algorithm_runtime_config_uri = "algorithm/yolov8_person_detection/configs/yolov8_person_detection.v1.example.yaml";
   worker_config.input_binding = "frames";
   worker_config.result_encoding = "json";
   worker_config.output_topic = "events.test";
@@ -126,7 +129,10 @@ int main() {
                                     &loaded_worker_config, &error));
   assert(loaded_worker_config.source.session_id == "source-demo");
   assert(loaded_worker_config.worker.session_id == "worker-0");
-  assert(loaded_worker_config.worker.algorithm_name == "detector");
+  assert(loaded_worker_config.worker.algorithm_name == "yolov8-person-detection");
+  assert(loaded_worker_config.worker.algorithm_package_uri == "algorithm/yolov8_person_detection");
+  assert(loaded_worker_config.worker.algorithm_entry_point == "evr::algorithm::yolov8_person_detection::YoloV8PersonDetector");
+  assert(loaded_worker_config.worker.algorithm_runtime_config_uri == "algorithm/yolov8_person_detection/configs/yolov8_person_detection.v1.example.yaml");
   assert(loaded_worker_config.worker.input_binding == "frames");
   assert(loaded_worker_config.worker.result_encoding == "json");
   assert(loaded_worker_config.worker.output_topic == "events.detection");

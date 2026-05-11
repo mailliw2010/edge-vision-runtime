@@ -14,9 +14,12 @@ worker:
   supervisor_endpoint: unix:///tmp/evr-supervisor.sock
   source_session_id: source-demo
   proto_version: v1
-  inference_backend: tensorrt
-  engine_path: models/detector.plan
-  algorithm_name: detector
+  inference_backend: onnxruntime
+  engine_path: models/yolov8s.onnx
+  algorithm_name: yolov8-person-detection
+  algorithm_package_uri: algorithm/yolov8_person_detection
+  algorithm_entry_point: evr::algorithm::yolov8_person_detection::YoloV8PersonDetector
+  algorithm_runtime_config_uri: algorithm/yolov8_person_detection/configs/yolov8_person_detection.v1.example.yaml
   input_binding: frames
   result_encoding: json
   output_topic: events.detection

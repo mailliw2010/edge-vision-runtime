@@ -13,6 +13,31 @@ C++ Runtime 仓，当前聚焦**真实最小业务闭环**的运行时承载。
 - 本机推理：**当前最小闭环优先 TensorRT**
 - Supervisor：负责编排 Source / Worker / graph / deployment 状态
 
+## ZLMediaKit 的架构边界
+
+ZLMediaKit 在本架构中定位为**视频入口网关 / 流媒体代理层**，不承担算法推理、
+deployment 真相源或 runtime 状态编排职责。
+
+它主要解决以下问题：
+
+- 统一接入 RTSP / 推流 / 后续 GB28181 等不同上游视频入口
+- 将不稳定或认证复杂的摄像头上游，代理成本机稳定的 `source_uri`
+- 为 runtime、预览、录像、调试工具等多个消费者复用同一路上游流
+- 把视频入口问题与 `SourceSession -> decode -> Worker -> result` 的执行链路解耦
+- 为后续按需拉流、在线状态、协议转换、录像和流事件回调预留边界
+
+因此，ZLM 对当前 runtime 单仓 smoke **不是硬依赖**。最小闭环优先按以下顺序推进：
+
+1. 本地视频文件：`file.mp4 -> decode -> RGBA frame -> Detect -> JSON result`
+2. 直接视频源：`rtsp://camera -> decode -> Detect -> result`
+3. ZLM 入口：`camera/upstream -> ZLMediaKit -> rtsp://127.0.0.1:8554/... -> runtime`
+
+这样可以先验证 runtime 能消费真实解码帧，再把 ZLM 放回入口层。进入多路视频、
+多消费者复用、协议转换或生产化摄像头接入时，ZLM 基本会成为必要的系统边界。
+
+ZLM 代理创建、出口验证和 runtime smoke 入口见
+[`docs/zlmediakit-runtime-integration.md`](docs/zlmediakit-runtime-integration.md)。
+
 当前阶段，runtime 已经开始同时维护：
 
 - YAML：用户侧/部署侧入口配置
@@ -33,6 +58,42 @@ C++ Runtime 仓，当前聚焦**真实最小业务闭环**的运行时承载。
 - 前端页面
 - 控制面业务编排真相源
 - 跨仓 REST / gRPC 契约定义
+
+## 测试规约
+
+统一引用 control-plane 的 `TESTING.md`，单元测试用本仓语言栈，系统测试 / 黑盒测试优先用 Python。
+
+## 测试入口
+
+runtime 仓当前的验证优先走 CTest / smoke test：
+
+```bash
+cmake -S . -B build
+cmake --build build
+cd build
+ctest --output-on-failure
+```
+
+最重要的 smoke 是：
+- `runtime_sessions_smoke_test`
+
+它覆盖：
+- supervisor / source / worker session 基本生命周期
+- phase-1 deployment normalize
+- graph / wiring 生成
+- example config loader
+
+当前状态：已在当前机器执行，5/5 CTest 通过。
+
+其他 CTest 也会覆盖：
+- `runtime_source_cli_smoke_test`
+- `runtime_worker_cli_smoke_test`
+- `runtime_supervisor_apply_cli_smoke_test`
+- `runtime_supervisor_status_cli_smoke_test`
+
+其中：
+- control-plane 黑盒脚本只校验 runtime 接入点是否可达
+- runtime 自身的 wiring、normalize、状态机验证以本仓 CTest 为准
 
 ## 当前骨架
 
