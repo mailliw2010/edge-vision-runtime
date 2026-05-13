@@ -30,7 +30,8 @@
 
 - control-plane 负责创建 deployment
 - runtime 负责表达 supervisor/source/worker 的最小 wiring
-- 当前阶段优先跑通“语义闭环”，不追求真实推理、真实 IPC 或完整 proto 传输层
+- 当前阶段优先跑通“语义闭环”。默认 smoke 使用 `synthetic` 后端保证测试稳定；
+  真实最小闭环的本机推理后端是 TensorRT
 - 视频执行链路按 `file.mp4 -> decode -> Detect -> result`、`rtsp://camera -> decode -> result`、
   `camera -> ZLMediaKit -> runtime` 的顺序推进
 
@@ -128,8 +129,8 @@ cd projects/edge-vision-runtime
 
 - 还不是完整 gRPC / IPC 闭环
 - 还没有真实 contracts runtime/v1 的传输层接线
-- 还没有真实 TensorRT / NVDEC 路径
-- 还没有把 GStreamer/DeepStream 解码实现接入 `SourceSession`
+- 已接入 TensorRT engine 加载和执行路径；ONNX 模型会先通过 `trtexec` 生成缓存 engine
+- 还没有把 NVDEC / GStreamer / DeepStream 解码路径接入 `SourceSession`
 - 还没有把 ZLMediaKit 作为入口网关纳入自动化 smoke
 - 状态主要仍是占位 / 内存态
 - runtime 侧的独立验证通过 runtime 仓自身的 CTest / smoke test 完成，control-plane 黑盒测试只校验其接入点是否可达

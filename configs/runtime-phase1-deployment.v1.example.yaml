@@ -22,7 +22,7 @@ worker:
   supervisor_endpoint: unix:///tmp/evr-supervisor.sock
   source_session_id: source-demo
   proto_version: v1
-  inference_backend: onnxruntime
+  inference_backend: tensorrt
   engine_path: models/yolov8s.onnx
   algorithm_name: yolov8-person-detection
   algorithm_package_uri: algorithm/yolov8_person_detection

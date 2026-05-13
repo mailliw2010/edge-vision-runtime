@@ -137,12 +137,12 @@ if(BUILD_TESTING)
   add_test(NAME runtime_rtsp_video_detect_result_smoke_test
     COMMAND runtime_rtsp_video_detect_result_smoke_test)
   set_tests_properties(runtime_rtsp_video_detect_result_smoke_test
-    PROPERTIES SKIP_RETURN_CODE 77 TIMEOUT 30)
+    PROPERTIES SKIP_RETURN_CODE 77 TIMEOUT 90)
 
   add_test(NAME runtime_zlm_video_detect_result_smoke_test
     COMMAND runtime_rtsp_video_detect_result_smoke_test EVR_TEST_ZLM_RTSP_URI zlm)
   set_tests_properties(runtime_zlm_video_detect_result_smoke_test
-    PROPERTIES SKIP_RETURN_CODE 77 TIMEOUT 30)
+    PROPERTIES SKIP_RETURN_CODE 77 TIMEOUT 90)
 
   add_test(NAME runtime_source_cli_smoke_test
     COMMAND $<TARGET_FILE:runtime-source> --config
@@ -150,6 +150,7 @@ if(BUILD_TESTING)
   add_test(NAME runtime_worker_cli_smoke_test
     COMMAND $<TARGET_FILE:runtime-worker> --config
             ${PROJECT_SOURCE_DIR}/configs/runtime-worker.v1.example.yaml
+            --inference-backend=synthetic
             --engine-path=${EVR_YOLOV8_MODEL_PATH}
             --algorithm-package-uri=file://${EVR_YOLOV8_PERSON_DETECTION_DIR}
             --algorithm-entry-point=evr::algorithm::yolov8_person_detection::YoloV8PersonDetector

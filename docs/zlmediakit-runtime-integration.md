@@ -126,6 +126,12 @@ runtime host cannot pull it with ffmpeg, GStreamer, or ZLM `addStreamProxy`:
 rtsp://<user>:<password>@192.168.11.198:554/h264/ch1/main/av_stream
 ```
 
+Use the alternate RTSP service on port 5504 for the ARM runtime smoke path:
+
+```text
+rtsp://<user>:<password>@192.168.11.198:5504/h264/ch1/main/av_stream
+```
+
 Observed behavior on the ARM host:
 
 - Raw RTSP `OPTIONS` receives `200 OK`
@@ -144,19 +150,19 @@ The runtime and ZLM path has also been validated with a working camera stream on
 without committing credentials:
 
 ```text
-camera 192.168.11.194 RTSP
-  -> ZLMediaKit addStreamProxy stream=camera-194
-  -> rtsp://127.0.0.1:8554/live/camera-194
+camera 192.168.11.198 RTSP
+  -> ZLMediaKit addStreamProxy stream=camera-198
+  -> rtsp://127.0.0.1:8554/live/camera-198
   -> runtime_zlm_video_detect_result_smoke_test
 ```
 
 Validation commands:
 
 ```bash
-EVR_TEST_RTSP_URI='rtsp://<user>:<password>@192.168.11.194/<path>' \
+EVR_TEST_RTSP_URI='rtsp://<user>:<password>@192.168.11.198:5504/<path>' \
   ctest --output-on-failure -R runtime_rtsp_video_detect_result_smoke_test
 
-EVR_TEST_ZLM_RTSP_URI='rtsp://127.0.0.1:8554/live/camera-194' \
+EVR_TEST_ZLM_RTSP_URI='rtsp://127.0.0.1:8554/live/camera-198' \
   ctest --output-on-failure -R runtime_zlm_video_detect_result_smoke_test
 ```
 
@@ -169,7 +175,7 @@ explicitly enabled:
 ```bash
 ./build/bin/runtime-worker \
   --config configs/runtime-worker.v1.example.yaml \
-  --source-uri rtsp://127.0.0.1:8554/live/camera-194 \
+  --source-uri rtsp://127.0.0.1:8554/live/camera-198 \
   --decode-source-frames \
   --frame-width 640 \
   --frame-height 360 \
@@ -179,6 +185,11 @@ explicitly enabled:
   --algorithm-entry-point evr::algorithm::yolov8_person_detection::YoloV8PersonDetector \
   --algorithm-runtime-config-uri "file://$(pwd)/algorithm/yolov8_person_detection/configs/yolov8_person_detection.v1.example.yaml"
 ```
+
+The production inference path uses TensorRT. For repeatable CTest smoke runs, tests override the
+algorithm backend to `synthetic`; this keeps video decode and result wiring testable without CUDA
+device access. Running the command above with the default `tensorrt` backend requires TensorRT,
+CUDA device access, and a valid `models/yolov8s.onnx` or serialized `.engine/.plan` file.
 
 Without `--decode-source-frames`, `runtime-worker` keeps using a synthetic frame so default CTest
 does not require ZLM or a camera.

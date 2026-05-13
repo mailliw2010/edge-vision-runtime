@@ -1,6 +1,7 @@
 #pragma once
 
 #include <cstdint>
+#include <memory>
 #include <string>
 #include <vector>
 
@@ -8,7 +9,7 @@ namespace evr::algorithm::yolov8_person_detection {
 
 struct AlgorithmConfig {
   std::string name{"yolov8-person-detection"};
-  std::string backend{"onnxruntime"};
+  std::string backend{"tensorrt"};
   std::string model_path;
   int input_width{640};
   int input_height{640};
@@ -30,6 +31,7 @@ struct Detection {
 class YoloV8PersonDetector {
  public:
   explicit YoloV8PersonDetector(AlgorithmConfig config);
+  ~YoloV8PersonDetector();
 
   const AlgorithmConfig& config() const;
   bool LoadModel(std::string* error);
@@ -55,8 +57,11 @@ class YoloV8PersonDetector {
                                 std::string* error) const;
 
  private:
+  struct RuntimeState;
+
   AlgorithmConfig config_;
   bool model_loaded_{false};
+  std::unique_ptr<RuntimeState> runtime_state_;
 };
 
 }  // namespace evr::algorithm::yolov8_person_detection

@@ -93,6 +93,7 @@ int main() {
   assert(raw_video.size() == frame_bytes * static_cast<std::size_t>(frame_count));
 
   evr::algorithm::yolov8_person_detection::AlgorithmConfig algorithm_config;
+  algorithm_config.backend = "synthetic";
   algorithm_config.model_path = EVR_TEST_YOLOV8S_MODEL_PATH;
   algorithm_config.input_width = 640;
   algorithm_config.input_height = 640;

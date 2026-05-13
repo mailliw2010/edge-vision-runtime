@@ -22,6 +22,9 @@ struct WorkerAppConfig {
   int source_frame_width{640};
   int source_frame_height{640};
   int source_frame_count{1};
+  std::string dump_dir{};
+  std::string event_store_dir{};
+  bool dump_negative_frames{false};
 };
 
 class WorkerApp {

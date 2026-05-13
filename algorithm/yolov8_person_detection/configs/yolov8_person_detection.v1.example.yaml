@@ -1,6 +1,6 @@
 algorithm:
   name: yolov8-person-detection
-  backend: onnxruntime
+  backend: tensorrt
   model_path: models/yolov8s.onnx
   input_width: 640
   input_height: 640

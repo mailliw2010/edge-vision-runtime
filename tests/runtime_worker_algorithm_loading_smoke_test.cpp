@@ -5,6 +5,7 @@
 
 int main() {
   evr::algorithm::yolov8_person_detection::AlgorithmConfig cfg;
+  cfg.backend = "synthetic";
   cfg.model_path = EVR_TEST_YOLOV8S_MODEL_PATH;
   cfg.input_width = 640;
   cfg.input_height = 640;

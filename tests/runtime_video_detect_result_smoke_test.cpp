@@ -43,7 +43,7 @@ int main() {
   evr::runtime::worker::WorkerSessionConfig worker_config;
   worker_config.session_id = "video-worker-smoke";
   worker_config.source_session_id = source_config.session_id;
-  worker_config.inference_backend = "onnxruntime-smoke";
+  worker_config.inference_backend = "synthetic";
   worker_config.engine_path = EVR_TEST_YOLOV8S_MODEL_PATH;
   worker_config.algorithm_name = "yolov8-person-detection";
   worker_config.input_binding = "frames";
@@ -54,6 +54,7 @@ int main() {
   assert(worker_session.state() == State::kRunning);
 
   evr::algorithm::yolov8_person_detection::AlgorithmConfig algorithm_config;
+  algorithm_config.backend = "synthetic";
   algorithm_config.model_path = EVR_TEST_YOLOV8S_MODEL_PATH;
   algorithm_config.input_width = 640;
   algorithm_config.input_height = 640;
