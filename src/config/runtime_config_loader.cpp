@@ -108,6 +108,21 @@ std::string GetValue(const SectionMap& sections,
   return value_it->second;
 }
 
+int GetIntValue(const SectionMap& sections,
+                const std::string& section,
+                const std::string& key,
+                int fallback) {
+  const std::string value = GetValue(sections, section, key, "");
+  if (value.empty()) {
+    return fallback;
+  }
+  try {
+    return std::stoi(value);
+  } catch (...) {
+    return fallback;
+  }
+}
+
 void FillSupervisorSessionConfig(const SectionMap& sections,
                                  supervisor::SupervisorSessionConfig* config) {
   config->session_id = GetValue(sections, "supervisor", "session_id", config->session_id);
@@ -130,6 +145,10 @@ void FillSourceSessionConfig(const SectionMap& sections, source::SourceSessionCo
   config->proto_version = GetValue(sections, "source", "proto_version", config->proto_version);
   config->decode_mode = GetValue(sections, "source", "decode_mode", config->decode_mode);
   config->pixel_format = GetValue(sections, "source", "pixel_format", config->pixel_format);
+  config->decode_timeout_seconds =
+      GetIntValue(sections, "source", "decode_timeout_seconds", config->decode_timeout_seconds);
+  config->decode_log_path =
+      GetValue(sections, "source", "decode_log_path", config->decode_log_path);
 }
 
 void FillWorkerSessionConfig(const SectionMap& sections, worker::WorkerSessionConfig* config) {

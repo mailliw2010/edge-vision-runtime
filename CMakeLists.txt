@@ -118,7 +118,7 @@ if(BUILD_TESTING)
   add_executable(runtime_file_video_detect_result_smoke_test
     tests/runtime_file_video_detect_result_smoke_test.cpp)
   target_link_libraries(runtime_file_video_detect_result_smoke_test
-    PRIVATE evr::yolov8_person_detection)
+    PRIVATE evr::runtime evr::yolov8_person_detection)
   evr_apply_common_settings(runtime_file_video_detect_result_smoke_test)
   target_compile_definitions(runtime_file_video_detect_result_smoke_test
     PRIVATE "EVR_TEST_YOLOV8S_MODEL_PATH=\"${EVR_YOLOV8_MODEL_PATH}\"")
@@ -130,7 +130,7 @@ if(BUILD_TESTING)
   add_executable(runtime_rtsp_video_detect_result_smoke_test
     tests/runtime_rtsp_video_detect_result_smoke_test.cpp)
   target_link_libraries(runtime_rtsp_video_detect_result_smoke_test
-    PRIVATE evr::yolov8_person_detection)
+    PRIVATE evr::runtime evr::yolov8_person_detection)
   evr_apply_common_settings(runtime_rtsp_video_detect_result_smoke_test)
   target_compile_definitions(runtime_rtsp_video_detect_result_smoke_test
     PRIVATE "EVR_TEST_YOLOV8S_MODEL_PATH=\"${EVR_YOLOV8_MODEL_PATH}\"")

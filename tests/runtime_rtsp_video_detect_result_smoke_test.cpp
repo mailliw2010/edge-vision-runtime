@@ -1,6 +1,4 @@
-#include <array>
 #include <cassert>
-#include <cstdio>
 #include <cstdint>
 #include <cstddef>
 #include <cstdlib>
@@ -15,6 +13,7 @@
 #include <vector>
 
 #include "evr/algorithm/yolov8_person_detection/yolov8_person_detector.h"
+#include "evr/runtime/source/source_session.h"
 
 #if defined(EVR_WITH_LIBJPEG)
 #include <jpeglib.h>
@@ -43,53 +42,6 @@ std::string ReadTextFile(const std::string& path) {
   std::ostringstream out;
   out << input.rdbuf();
   return out.str();
-}
-
-std::vector<std::uint8_t> ReadCommandBytes(const std::string& command, int* exit_status) {
-  std::vector<std::uint8_t> bytes;
-  FILE* pipe = popen(command.c_str(), "r");
-  if (pipe == nullptr) {
-    if (exit_status != nullptr) {
-      *exit_status = -1;
-    }
-    return bytes;
-  }
-
-  std::array<unsigned char, 8192> buffer{};
-  while (true) {
-    const std::size_t read = std::fread(buffer.data(), 1, buffer.size(), pipe);
-    if (read > 0) {
-      bytes.insert(bytes.end(), buffer.begin(), buffer.begin() + static_cast<std::ptrdiff_t>(read));
-    }
-    if (read < buffer.size()) {
-      if (std::feof(pipe) != 0) {
-        break;
-      }
-      if (std::ferror(pipe) != 0) {
-        bytes.clear();
-        break;
-      }
-    }
-  }
-
-  const int status = pclose(pipe);
-  if (exit_status != nullptr) {
-    *exit_status = status;
-  }
-  return bytes;
-}
-
-std::string ShellQuote(const std::string& value) {
-  std::string quoted = "'";
-  for (const char ch : value) {
-    if (ch == '\'') {
-      quoted += "'\\''";
-    } else {
-      quoted += ch;
-    }
-  }
-  quoted += "'";
-  return quoted;
 }
 
 std::string RedactUri(const std::string& uri) {
@@ -328,24 +280,27 @@ int main(int argc, char** argv) {
   const int frame_count = 3;
   const int ffmpeg_timeout_seconds = 60;
 
-  const std::string decode_command =
-      "timeout " + std::to_string(ffmpeg_timeout_seconds) +
-      "s ffmpeg -nostdin -hide_banner -loglevel warning -rtsp_transport tcp "
-      "-stimeout 10000000 -i " +
-      ShellQuote(rtsp_uri) +
-      " -an -frames:v 3 -vf scale=640:360 -f rawvideo -pix_fmt rgba - "
-      "2>/tmp/evr_runtime_rtsp_video_detect_result_ffmpeg.log";
-  int decode_exit_status = 0;
-  const auto raw_video = ReadCommandBytes(decode_command, &decode_exit_status);
-  const std::size_t frame_bytes =
-      static_cast<std::size_t>(frame_width) * static_cast<std::size_t>(frame_height) * 4U;
-  if (raw_video.size() != frame_bytes * static_cast<std::size_t>(frame_count)) {
-    const std::string ffmpeg_log =
-        ReadTextFile("/tmp/evr_runtime_rtsp_video_detect_result_ffmpeg.log");
-    std::cerr << "failed to decode RTSP frames from " << RedactUri(rtsp_uri)
-              << "; expected " << frame_count << " RGBA frames, got " << raw_video.size()
-              << " bytes; ffmpeg exit status " << decode_exit_status
-              << "; see /tmp/evr_runtime_rtsp_video_detect_result_ffmpeg.log\n";
+  evr::runtime::source::SourceSession source_session;
+  evr::runtime::source::SourceSessionConfig source_config;
+  source_config.session_id = source_label + "-video-source-smoke";
+  source_config.source_uri = rtsp_uri;
+  source_config.upstream_kind = source_label == "zlm" ? "zlm-proxy" : "direct-rtsp";
+  source_config.transport_protocol = "rtsp";
+  source_config.buffer_transport = "host-memory";
+  source_config.decode_mode = "ffmpeg";
+  source_config.pixel_format = "rgba";
+  source_config.decode_timeout_seconds = ffmpeg_timeout_seconds;
+  source_config.decode_log_path = "/tmp/evr_runtime_" + source_label +
+                                  "_video_detect_result_ffmpeg.log";
+  assert(source_session.Configure(source_config));
+  assert(source_session.Start());
+
+  std::string error;
+  const auto frames = source_session.CaptureFramesFromSource(frame_width, frame_height, frame_count,
+                                                            &error);
+  if (frames.size() != static_cast<std::size_t>(frame_count)) {
+    const std::string ffmpeg_log = ReadTextFile(source_config.decode_log_path);
+    std::cerr << error << '\n';
     if (!ffmpeg_log.empty()) {
       std::cerr << "ffmpeg stderr:\n" << ffmpeg_log;
     }
@@ -366,7 +321,6 @@ int main(int argc, char** argv) {
   algorithm_config.confidence_threshold = 0.25F;
 
   evr::algorithm::yolov8_person_detection::YoloV8PersonDetector detector(algorithm_config);
-  std::string error;
   if (!detector.LoadModel(&error)) {
     std::cerr << "failed to load detector model with backend=" << algorithm_config.backend
               << ", model_path=" << algorithm_config.model_path << ": " << error << '\n';
@@ -379,17 +333,14 @@ int main(int argc, char** argv) {
 
   std::vector<std::string> encoded_results;
   for (int frame_id = 0; frame_id < frame_count; ++frame_id) {
-    const auto first = raw_video.begin() + static_cast<std::ptrdiff_t>(frame_bytes * frame_id);
-    const auto last = first + static_cast<std::ptrdiff_t>(frame_bytes);
-    const std::vector<std::uint8_t> rgba_frame(first, last);
-
-    const auto detections = detector.Detect(rgba_frame, frame_width, frame_height, &error);
+    const auto& frame = frames[static_cast<std::size_t>(frame_id)];
+    const auto detections = detector.Detect(frame.rgba, frame.width, frame.height, &error);
     if (detections.empty()) {
       std::cerr << "no detections for frame " << frame_id << " with backend="
                 << algorithm_config.backend << ": " << error << '\n';
       if (save_negative_frames) {
-        assert(PersistLocalEvent(event_dir, frame_id, rtsp_uri, rgba_frame, frame_width,
-                                 frame_height, detections, false));
+        assert(PersistLocalEvent(event_dir, frame_id, rtsp_uri, frame.rgba, frame.width,
+                                 frame.height, detections, false));
       }
       continue;
     }
@@ -398,7 +349,7 @@ int main(int argc, char** argv) {
       return 1;
     }
     encoded_results.push_back(EncodeDetectionResultJson(frame_id, rtsp_uri, detections.front()));
-    assert(PersistLocalEvent(event_dir, frame_id, rtsp_uri, rgba_frame, frame_width, frame_height,
+    assert(PersistLocalEvent(event_dir, frame_id, rtsp_uri, frame.rgba, frame.width, frame.height,
                              detections, true));
   }
 
@@ -416,5 +367,6 @@ int main(int argc, char** argv) {
   assert(encoded_results.front().find("\"source_uri\":\"rtsp://") != std::string::npos);
   assert(encoded_results.front().find("\"class_name\":\"person\"") != std::string::npos);
 
+  source_session.Stop();
   return 0;
 }

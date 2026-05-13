@@ -37,10 +37,13 @@ bool IsRtspUri(const std::string& uri) {
   return uri.rfind("rtsp://", 0) == 0 || uri.rfind("rtsps://", 0) == 0;
 }
 
-std::vector<std::uint8_t> ReadCommandBytes(const std::string& command) {
+std::vector<std::uint8_t> ReadCommandBytes(const std::string& command, int* exit_status) {
   std::vector<std::uint8_t> bytes;
   FILE* pipe = popen(command.c_str(), "r");
   if (pipe == nullptr) {
+    if (exit_status != nullptr) {
+      *exit_status = -1;
+    }
     return bytes;
   }
 
@@ -61,7 +64,11 @@ std::vector<std::uint8_t> ReadCommandBytes(const std::string& command) {
     }
   }
 
-  if (pclose(pipe) != 0) {
+  const int status = pclose(pipe);
+  if (exit_status != nullptr) {
+    *exit_status = status;
+  }
+  if (status != 0) {
     bytes.clear();
   }
   return bytes;
@@ -103,11 +110,12 @@ session::Snapshot SourceSession::GetSnapshot() const {
   snapshot.kind = std::string(Kind());
   snapshot.session_id = config_.session_id;
   snapshot.state = state_;
-  snapshot.detail = "uri=" + config_.source_uri + ", upstream_kind=" + config_.upstream_kind +
-                    ", upstream_endpoint=" + config_.upstream_endpoint + ", transport=" +
-                    config_.transport_protocol + ", buffer=" + config_.buffer_transport +
-                    ", proto=" + config_.proto_version + ", decode=" + config_.decode_mode +
-                    ", pixel=" + config_.pixel_format;
+  snapshot.detail = "uri=" + RedactUri(config_.source_uri) +
+                    ", upstream_kind=" + config_.upstream_kind +
+                    ", upstream_endpoint=" + RedactUri(config_.upstream_endpoint) +
+                    ", transport=" + config_.transport_protocol +
+                    ", buffer=" + config_.buffer_transport + ", proto=" + config_.proto_version +
+                    ", decode=" + config_.decode_mode + ", pixel=" + config_.pixel_format;
   return snapshot;
 }
 
@@ -136,16 +144,22 @@ std::vector<FrameBuffer> SourceSession::CaptureFramesFromSource(int width,
     return {};
   }
 
-  std::string command = "ffmpeg -hide_banner -loglevel error ";
+  std::string command;
+  if (config_.decode_timeout_seconds > 0) {
+    command += "timeout " + std::to_string(config_.decode_timeout_seconds) + "s ";
+  }
+  command += "ffmpeg -nostdin -hide_banner -loglevel warning ";
   if (IsRtspUri(config_.source_uri)) {
     command += "-rtsp_transport tcp -stimeout 10000000 ";
   }
   command += "-i " + ShellQuote(config_.source_uri) + " -an -frames:v " +
              std::to_string(frame_count) + " -vf scale=" + std::to_string(width) + ":" +
              std::to_string(height) + " -f rawvideo -pix_fmt rgba - "
-             "2>/tmp/evr_runtime_source_ffmpeg.log";
+             "2>" +
+             ShellQuote(config_.decode_log_path);
 
-  const auto raw_video = ReadCommandBytes(command);
+  int decode_exit_status = 0;
+  const auto raw_video = ReadCommandBytes(command, &decode_exit_status);
   const std::size_t frame_bytes =
       static_cast<std::size_t>(width) * static_cast<std::size_t>(height) * 4U;
   const std::size_t expected_bytes = frame_bytes * static_cast<std::size_t>(frame_count);
@@ -153,7 +167,8 @@ std::vector<FrameBuffer> SourceSession::CaptureFramesFromSource(int width,
     if (error != nullptr) {
       *error = "failed to decode " + std::to_string(frame_count) + " frame(s) from " +
                RedactUri(config_.source_uri) + ": expected " + std::to_string(expected_bytes) +
-               " bytes, got " + std::to_string(raw_video.size());
+               " bytes, got " + std::to_string(raw_video.size()) + "; ffmpeg exit status " +
+               std::to_string(decode_exit_status) + "; see " + config_.decode_log_path;
     }
     return {};
   }

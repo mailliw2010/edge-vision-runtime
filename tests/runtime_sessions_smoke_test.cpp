@@ -34,6 +34,8 @@ int main() {
   source_config.proto_version = "v1";
   source_config.decode_mode = "jetson-nvdec";
   source_config.pixel_format = "nv12";
+  source_config.decode_timeout_seconds = 60;
+  source_config.decode_log_path = "/tmp/test-source-ffmpeg.log";
   assert(source_session.Configure(source_config));
   assert(source_session.Start());
   assert(source_session.GetSnapshot().state == State::kRunning);
@@ -103,6 +105,8 @@ int main() {
   assert(loaded_source_config.session.transport_protocol == "rtsp");
   assert(loaded_source_config.session.buffer_transport == "nvmm");
   assert(loaded_source_config.session.pixel_format == "nv12");
+  assert(loaded_source_config.session.decode_timeout_seconds == 60);
+  assert(loaded_source_config.session.decode_log_path == "/tmp/evr_runtime_source_ffmpeg.log");
 
   evr::runtime::supervisor::SupervisorAppConfig loaded_supervisor_config;
   assert(loader.LoadSupervisorAppConfig(

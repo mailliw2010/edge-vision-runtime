@@ -1,8 +1,4 @@
-#include <array>
 #include <cassert>
-#include <cstdio>
-#include <cstdint>
-#include <cstddef>
 #include <cstdlib>
 #include <filesystem>
 #include <iostream>
@@ -11,41 +7,12 @@
 #include <vector>
 
 #include "evr/algorithm/yolov8_person_detection/yolov8_person_detector.h"
+#include "evr/runtime/source/source_session.h"
 
 namespace {
 
 bool CommandOk(const std::string& command) {
   return std::system(command.c_str()) == 0;
-}
-
-std::vector<std::uint8_t> ReadCommandBytes(const std::string& command) {
-  std::vector<std::uint8_t> bytes;
-  FILE* pipe = popen(command.c_str(), "r");
-  if (pipe == nullptr) {
-    return bytes;
-  }
-
-  std::array<unsigned char, 8192> buffer{};
-  while (true) {
-    const std::size_t read = std::fread(buffer.data(), 1, buffer.size(), pipe);
-    if (read > 0) {
-      bytes.insert(bytes.end(), buffer.begin(), buffer.begin() + static_cast<std::ptrdiff_t>(read));
-    }
-    if (read < buffer.size()) {
-      if (std::feof(pipe) != 0) {
-        break;
-      }
-      if (std::ferror(pipe) != 0) {
-        bytes.clear();
-        break;
-      }
-    }
-  }
-
-  if (pclose(pipe) != 0) {
-    bytes.clear();
-  }
-  return bytes;
 }
 
 std::string EncodeDetectionResultJson(
@@ -84,13 +51,23 @@ int main() {
   assert(CommandOk(generate_command));
   assert(std::filesystem::exists(video_path));
 
-  const std::string decode_command =
-      "ffmpeg -hide_banner -loglevel error -i " + video_path.string() +
-      " -frames:v 3 -f rawvideo -pix_fmt rgba -";
-  const auto raw_video = ReadCommandBytes(decode_command);
-  const std::size_t frame_bytes =
-      static_cast<std::size_t>(frame_width) * static_cast<std::size_t>(frame_height) * 4U;
-  assert(raw_video.size() == frame_bytes * static_cast<std::size_t>(frame_count));
+  evr::runtime::source::SourceSession source_session;
+  evr::runtime::source::SourceSessionConfig source_config;
+  source_config.session_id = "file-video-source-smoke";
+  source_config.source_uri = source_uri;
+  source_config.upstream_kind = "file";
+  source_config.transport_protocol = "file";
+  source_config.buffer_transport = "host-memory";
+  source_config.decode_mode = "ffmpeg";
+  source_config.pixel_format = "rgba";
+  source_config.decode_log_path = "/tmp/evr_runtime_file_video_detect_result_ffmpeg.log";
+  assert(source_session.Configure(source_config));
+  assert(source_session.Start());
+
+  std::string error;
+  const auto frames = source_session.CaptureFramesFromSource(frame_width, frame_height, frame_count,
+                                                            &error);
+  assert(frames.size() == static_cast<std::size_t>(frame_count));
 
   evr::algorithm::yolov8_person_detection::AlgorithmConfig algorithm_config;
   algorithm_config.backend = "synthetic";
@@ -100,16 +77,12 @@ int main() {
   algorithm_config.confidence_threshold = 0.25F;
 
   evr::algorithm::yolov8_person_detection::YoloV8PersonDetector detector(algorithm_config);
-  std::string error;
   assert(detector.LoadModel(&error));
 
   std::vector<std::string> encoded_results;
   for (int frame_id = 0; frame_id < frame_count; ++frame_id) {
-    const auto first = raw_video.begin() + static_cast<std::ptrdiff_t>(frame_bytes * frame_id);
-    const auto last = first + static_cast<std::ptrdiff_t>(frame_bytes);
-    const std::vector<std::uint8_t> rgba_frame(first, last);
-
-    const auto detections = detector.Detect(rgba_frame, frame_width, frame_height, &error);
+    const auto& frame = frames[static_cast<std::size_t>(frame_id)];
+    const auto detections = detector.Detect(frame.rgba, frame.width, frame.height, &error);
     assert(!detections.empty());
     assert(detections.front().class_name == "person");
     encoded_results.push_back(EncodeDetectionResultJson(frame_id, source_uri, detections.front()));
@@ -121,5 +94,6 @@ int main() {
   assert(encoded_results.front().find("\"class_name\":\"person\"") != std::string::npos);
 
   std::filesystem::remove(video_path);
+  source_session.Stop();
   return 0;
 }

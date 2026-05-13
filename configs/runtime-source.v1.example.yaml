@@ -6,3 +6,5 @@ source:
   proto_version: v1
   decode_mode: jetson-nvdec
   pixel_format: nv12
+  decode_timeout_seconds: 60
+  decode_log_path: /tmp/evr_runtime_source_ffmpeg.log

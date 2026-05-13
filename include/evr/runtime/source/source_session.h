@@ -19,6 +19,8 @@ struct SourceSessionConfig {
   std::string proto_version{"v1"};
   std::string decode_mode{"jetson-nvdec"};
   std::string pixel_format{"nv12"};
+  int decode_timeout_seconds{60};
+  std::string decode_log_path{"/tmp/evr_runtime_source_ffmpeg.log"};
 };
 
 struct FrameBuffer {

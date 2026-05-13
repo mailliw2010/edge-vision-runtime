@@ -105,8 +105,10 @@ ZLM outlet RTSP -> ffmpeg decode -> RGBA frames -> detector -> JSON result
 3. `runtime_zlm_video_detect_result_smoke_test` validates the ZLM outlet when
    `EVR_TEST_ZLM_RTSP_URI` is set.
 
-Once the RTSP/ZLM smoke is reliable, move the decode path into `SourceSession` instead of keeping
-the decode inside the CTest process.
+The file / direct RTSP / ZLM smoke tests now route decode through `SourceSession`. The current
+implementation still uses bounded ffmpeg CLI capture as the portable phase-1 bridge; the next
+runtime-only step is replacing that bridge with a long-lived SourceSession decode loop backed by
+GStreamer / NVDEC / DeepStream on Jetson.
 
 ## Current ARM camera compatibility note
 

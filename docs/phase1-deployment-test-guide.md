@@ -78,7 +78,7 @@ cd projects/edge-vision-runtime
 
 当前 `runtime-worker` CLI 会先跑通 source/worker 生命周期、算法配置加载、模型可读性检查、
 合成帧 Detect 和 detection 输出。真实视频文件闭环由 CTest 中的
-`runtime_file_video_detect_result_smoke_test` 覆盖。
+`runtime_file_video_detect_result_smoke_test` 覆盖，解码入口统一走 `SourceSession`。
 
 直接 RTSP 视频源用可选 CTest 覆盖，不把带认证信息的 URL 写入仓库：
 
@@ -123,15 +123,15 @@ cd projects/edge-vision-runtime
 - deployment spec 能 normalize
 - apply/status 命令能打印 wiring 结果
 - `runtime-worker` / `runtime-source` 能各自完成最小启动
-- `runtime_file_video_detect_result_smoke_test` 能完成临时 MP4 生成、解码、Detect、JSON 结果断言
+- `runtime_file_video_detect_result_smoke_test` 能通过 `SourceSession` 完成临时 MP4 生成、解码、Detect、JSON 结果断言
 
 ## 6. 当前已知限制
 
 - 还不是完整 gRPC / IPC 闭环
 - 还没有真实 contracts runtime/v1 的传输层接线
 - 已接入 TensorRT engine 加载和执行路径；ONNX 模型会先通过 `trtexec` 生成缓存 engine
-- 还没有把 NVDEC / GStreamer / DeepStream 解码路径接入 `SourceSession`
-- 还没有把 ZLMediaKit 作为入口网关纳入自动化 smoke
+- `SourceSession` 当前先用 ffmpeg CLI 承接 file / RTSP / ZLM 出口解码，后续再替换为 NVDEC / GStreamer / DeepStream 常驻链路
+- ZLMediaKit 出口已作为可选 smoke 入口，仍依赖外部 ZLM 实例和 `EVR_TEST_ZLM_RTSP_URI`
 - 状态主要仍是占位 / 内存态
 - runtime 侧的独立验证通过 runtime 仓自身的 CTest / smoke test 完成，control-plane 黑盒测试只校验其接入点是否可达
 
