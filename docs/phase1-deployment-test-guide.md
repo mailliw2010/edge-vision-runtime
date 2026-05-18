@@ -80,6 +80,22 @@ cd projects/edge-vision-runtime
 合成帧 Detect 和 detection 输出。真实视频文件闭环由 CTest 中的
 `runtime_file_video_detect_result_smoke_test` 覆盖，解码入口统一走 `SourceSession`。
 
+单路流 + 1 算法的本地可重复入口：
+
+```bash
+ctest --output-on-failure -R runtime_file_video_detect_result_smoke_test
+```
+
+多路流 + 1 算法的本地可重复入口：
+
+```bash
+ctest --output-on-failure -R runtime_multi_stream_one_algorithm_smoke_test
+```
+
+当前多路 smoke 使用两个临时视频文件模拟两路 source，共用一个 YOLOv8 detector，验证每路
+`source_session_id` 都能进入检测结果。真实 RTSP / ZLM 多路压测应在这个语义闭环稳定后，
+再把 source URI 换成实际多路流。
+
 直接 RTSP 视频源用可选 CTest 覆盖，不把带认证信息的 URL 写入仓库：
 
 ```bash
@@ -124,6 +140,7 @@ cd projects/edge-vision-runtime
 - apply/status 命令能打印 wiring 结果
 - `runtime-worker` / `runtime-source` 能各自完成最小启动
 - `runtime_file_video_detect_result_smoke_test` 能通过 `SourceSession` 完成临时 MP4 生成、解码、Detect、JSON 结果断言
+- `runtime_multi_stream_one_algorithm_smoke_test` 能用多个 `SourceSession` 共用一个 detector 完成多路 source 结果断言
 
 ## 6. 当前已知限制
 
@@ -132,6 +149,7 @@ cd projects/edge-vision-runtime
 - 已接入 TensorRT engine 加载和执行路径；ONNX 模型会先通过 `trtexec` 生成缓存 engine
 - `SourceSession` 当前先用 ffmpeg CLI 承接 file / RTSP / ZLM 出口解码，后续再替换为 NVDEC / GStreamer / DeepStream 常驻链路
 - ZLMediaKit 出口已作为可选 smoke 入口，仍依赖外部 ZLM 实例和 `EVR_TEST_ZLM_RTSP_URI`
+- 多路 smoke 目前验证的是多路 source + 单算法语义，不是常驻并发调度器；生产形态还需要多 source runner 和 source -> worker 帧通路
 - 状态主要仍是占位 / 内存态
 - runtime 侧的独立验证通过 runtime 仓自身的 CTest / smoke test 完成，control-plane 黑盒测试只校验其接入点是否可达
 

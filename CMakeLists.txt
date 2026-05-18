@@ -127,6 +127,18 @@ if(BUILD_TESTING)
   set_tests_properties(runtime_file_video_detect_result_smoke_test
     PROPERTIES SKIP_RETURN_CODE 77)
 
+  add_executable(runtime_multi_stream_one_algorithm_smoke_test
+    tests/runtime_multi_stream_one_algorithm_smoke_test.cpp)
+  target_link_libraries(runtime_multi_stream_one_algorithm_smoke_test
+    PRIVATE evr::runtime evr::yolov8_person_detection)
+  evr_apply_common_settings(runtime_multi_stream_one_algorithm_smoke_test)
+  target_compile_definitions(runtime_multi_stream_one_algorithm_smoke_test
+    PRIVATE "EVR_TEST_YOLOV8S_MODEL_PATH=\"${EVR_YOLOV8_MODEL_PATH}\"")
+  add_test(NAME runtime_multi_stream_one_algorithm_smoke_test
+    COMMAND runtime_multi_stream_one_algorithm_smoke_test)
+  set_tests_properties(runtime_multi_stream_one_algorithm_smoke_test
+    PROPERTIES SKIP_RETURN_CODE 77)
+
   add_executable(runtime_rtsp_video_detect_result_smoke_test
     tests/runtime_rtsp_video_detect_result_smoke_test.cpp)
   target_link_libraries(runtime_rtsp_video_detect_result_smoke_test
