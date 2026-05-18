@@ -132,7 +132,7 @@ ctest --output-on-failure
 这版只保留第一阶段真正需要的接口边界：
 
 - `SupervisorApp` / `SupervisorSession`：后续承接调度、恢复、状态汇总；当前已挂上最小 deployment apply/status 占位
-- `SourceApp` / `SourceSession`：承接 source URI、受限 ffmpeg 解码入口，并为后续拉流、解码、帧分发常驻化预留边界
+- `SourceApp` / `SourceSession`：承接 source URI、受限 ffmpeg / GStreamer appsink 解码入口，并为后续拉流、解码、帧分发常驻化预留边界
 - `WorkerApp` / `WorkerSession`：承接 TensorRT 推理、模型生命周期、本机 IPC
 
 其中：
@@ -160,7 +160,7 @@ ctest --output-on-failure
 ## 尚未接入
 
 - proto v1 的真实消息定义与序列化
-- Jetson NVDEC / GStreamer / DeepStream 常驻解码链路，以及 TensorRT engine 构建/部署策略完善
+- Jetson NVDEC / DeepStream 常驻解码链路，以及 TensorRT engine 构建/部署策略完善
 - supervisor <-> worker 的真实控制面链路
 - source -> worker 的帧通路
 - 完整 YAML 解析、schema 校验、CLI 传参接线（当前只有极简 YAML-ish loader，够读取 examples）

@@ -96,6 +96,18 @@ ctest --output-on-failure -R runtime_multi_stream_one_algorithm_smoke_test
 `source_session_id` 都能进入检测结果。真实 RTSP / ZLM 多路压测应在这个语义闭环稳定后，
 再把 source URI 换成实际多路流。
 
+GStreamer backend 的本地可重复入口：
+
+```bash
+ctest --output-on-failure -R runtime_gstreamer_video_decode_smoke_test
+```
+
+该测试只在构建机存在 `gstreamer-1.0` 和 `gstreamer-app-1.0` 开发库时登记。它使用
+`decode_mode: gstreamer` 和内建 `gst-testsrc://` 源走 `SourceSession` 的 appsink 解码路径，
+再接同一个 YOLOv8 detector 验证结果。没有 GStreamer 开发库时，runtime 仍保留 ffmpeg
+bridge 可编译。真实 file / RTSP URI 也会进入 GStreamer `uridecodebin` 路径，但在 Jetson
+环境上可能依赖可用的 NVIDIA 设备节点和插件配置。
+
 直接 RTSP 视频源用可选 CTest 覆盖，不把带认证信息的 URL 写入仓库：
 
 ```bash
@@ -140,6 +152,7 @@ cd projects/edge-vision-runtime
 - apply/status 命令能打印 wiring 结果
 - `runtime-worker` / `runtime-source` 能各自完成最小启动
 - `runtime_file_video_detect_result_smoke_test` 能通过 `SourceSession` 完成临时 MP4 生成、解码、Detect、JSON 结果断言
+- `runtime_gstreamer_video_decode_smoke_test` 能通过 `SourceSession` 的 GStreamer appsink backend 完成解码、Detect、结果断言
 - `runtime_multi_stream_one_algorithm_smoke_test` 能用多个 `SourceSession` 共用一个 detector 完成多路 source 结果断言
 
 ## 6. 当前已知限制
@@ -147,7 +160,7 @@ cd projects/edge-vision-runtime
 - 还不是完整 gRPC / IPC 闭环
 - 还没有真实 contracts runtime/v1 的传输层接线
 - 已接入 TensorRT engine 加载和执行路径；ONNX 模型会先通过 `trtexec` 生成缓存 engine
-- `SourceSession` 当前先用 ffmpeg CLI 承接 file / RTSP / ZLM 出口解码，后续再替换为 NVDEC / GStreamer / DeepStream 常驻链路
+- `SourceSession` 当前已有 ffmpeg bridge 和 GStreamer appsink backend；GStreamer 仍是按需拉取有限帧的 smoke 路径，还不是常驻 NVDEC / DeepStream pipeline
 - ZLMediaKit 出口已作为可选 smoke 入口，仍依赖外部 ZLM 实例和 `EVR_TEST_ZLM_RTSP_URI`
 - 多路 smoke 目前验证的是多路 source + 单算法语义，不是常驻并发调度器；生产形态还需要多 source runner 和 source -> worker 帧通路
 - 状态主要仍是占位 / 内存态

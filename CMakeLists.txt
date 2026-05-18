@@ -3,6 +3,7 @@ project(edge_vision_runtime VERSION 0.1.0 LANGUAGES CXX)
 
 include(GNUInstallDirs)
 include(CTest)
+find_package(PkgConfig)
 
 option(EVR_ENABLE_INSTALL "Enable install targets" ON)
 
@@ -56,6 +57,16 @@ add_library(evr_runtime STATIC
 add_library(evr::runtime ALIAS evr_runtime)
 
 target_link_libraries(evr_runtime PRIVATE evr::yolov8_person_detection)
+
+if(PkgConfig_FOUND)
+  pkg_check_modules(GSTREAMER QUIET gstreamer-1.0 gstreamer-app-1.0)
+endif()
+if(GSTREAMER_FOUND)
+  target_compile_definitions(evr_runtime PUBLIC EVR_WITH_GSTREAMER=1)
+  target_include_directories(evr_runtime PUBLIC ${GSTREAMER_INCLUDE_DIRS})
+  target_link_directories(evr_runtime PUBLIC ${GSTREAMER_LIBRARY_DIRS})
+  target_link_libraries(evr_runtime PUBLIC ${GSTREAMER_LIBRARIES})
+endif()
 
 evr_apply_common_settings(evr_runtime)
 set_target_properties(evr_runtime PROPERTIES
@@ -126,6 +137,20 @@ if(BUILD_TESTING)
     COMMAND runtime_file_video_detect_result_smoke_test)
   set_tests_properties(runtime_file_video_detect_result_smoke_test
     PROPERTIES SKIP_RETURN_CODE 77)
+
+  if(GSTREAMER_FOUND)
+    add_executable(runtime_gstreamer_video_decode_smoke_test
+      tests/runtime_gstreamer_video_decode_smoke_test.cpp)
+    target_link_libraries(runtime_gstreamer_video_decode_smoke_test
+      PRIVATE evr::runtime evr::yolov8_person_detection)
+    evr_apply_common_settings(runtime_gstreamer_video_decode_smoke_test)
+    target_compile_definitions(runtime_gstreamer_video_decode_smoke_test
+      PRIVATE "EVR_TEST_YOLOV8S_MODEL_PATH=\"${EVR_YOLOV8_MODEL_PATH}\"")
+    add_test(NAME runtime_gstreamer_video_decode_smoke_test
+      COMMAND runtime_gstreamer_video_decode_smoke_test)
+    set_tests_properties(runtime_gstreamer_video_decode_smoke_test
+      PROPERTIES SKIP_RETURN_CODE 77)
+  endif()
 
   add_executable(runtime_multi_stream_one_algorithm_smoke_test
     tests/runtime_multi_stream_one_algorithm_smoke_test.cpp)
