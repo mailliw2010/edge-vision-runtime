@@ -100,6 +100,7 @@ GStreamer backend 的本地可重复入口：
 
 ```bash
 ctest --output-on-failure -R runtime_gstreamer_video_decode_smoke_test
+ctest --output-on-failure -R runtime_gstreamer_multi_stream_one_algorithm_smoke_test
 ```
 
 该测试只在构建机存在 `gstreamer-1.0` 和 `gstreamer-app-1.0` 开发库时登记。它使用
@@ -107,6 +108,40 @@ ctest --output-on-failure -R runtime_gstreamer_video_decode_smoke_test
 再接同一个 YOLOv8 detector 验证结果。没有 GStreamer 开发库时，runtime 仍保留 ffmpeg
 bridge 可编译。真实 file / RTSP URI 也会进入 GStreamer `uridecodebin` 路径，但在 Jetson
 环境上可能依赖可用的 NVIDIA 设备节点和插件配置。
+
+多路真实 RTSP 调试建议直接改配置文件：
+
+```yaml
+test:
+  frame_width: 640
+  frame_height: 360
+  frame_count: 3
+  inference_backend: synthetic
+
+stream.camera-main:
+  source_uri: rtsp://192.168.11.198:5504/main
+  upstream_kind: direct-rtsp
+  transport_protocol: rtsp
+  decode_mode: gstreamer
+  pixel_format: rgba
+  decode_timeout_seconds: 10
+
+stream.camera-sub:
+  source_uri: rtsp://192.168.11.198:5504/sub
+  upstream_kind: direct-rtsp
+  transport_protocol: rtsp
+  decode_mode: gstreamer
+  pixel_format: rgba
+  decode_timeout_seconds: 10
+```
+
+默认配置在 `configs/runtime-multi-stream-gstreamer-smoke.v1.example.yaml`，为了让 CTest
+稳定，它使用两路 `gst-testsrc://`。把 `source_uri` 换成内网 RTSP 后，直接运行：
+
+```bash
+./runtime_gstreamer_multi_stream_one_algorithm_smoke_test \
+  ../configs/runtime-multi-stream-gstreamer-smoke.v1.example.yaml
+```
 
 直接 RTSP 视频源用可选 CTest 覆盖，不把带认证信息的 URL 写入仓库：
 
@@ -153,6 +188,7 @@ cd projects/edge-vision-runtime
 - `runtime-worker` / `runtime-source` 能各自完成最小启动
 - `runtime_file_video_detect_result_smoke_test` 能通过 `SourceSession` 完成临时 MP4 生成、解码、Detect、JSON 结果断言
 - `runtime_gstreamer_video_decode_smoke_test` 能通过 `SourceSession` 的 GStreamer appsink backend 完成解码、Detect、结果断言
+- `runtime_gstreamer_multi_stream_one_algorithm_smoke_test` 能从配置文件读取多路 source，并通过 GStreamer backend 共用一个 detector 完成结果断言
 - `runtime_multi_stream_one_algorithm_smoke_test` 能用多个 `SourceSession` 共用一个 detector 完成多路 source 结果断言
 
 ## 6. 当前已知限制

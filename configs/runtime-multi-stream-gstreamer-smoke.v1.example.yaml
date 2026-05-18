@@ -1,0 +1,21 @@
+test:
+  frame_width: 640
+  frame_height: 360
+  frame_count: 3
+  inference_backend: synthetic
+
+stream.camera-0:
+  source_uri: gst-testsrc://camera-0
+  upstream_kind: gstreamer-testsrc
+  transport_protocol: in-process
+  decode_mode: gstreamer
+  pixel_format: rgba
+  decode_timeout_seconds: 10
+
+stream.camera-1:
+  source_uri: gst-testsrc://camera-1
+  upstream_kind: gstreamer-testsrc
+  transport_protocol: in-process
+  decode_mode: gstreamer
+  pixel_format: rgba
+  decode_timeout_seconds: 10

@@ -105,6 +105,8 @@ if(BUILD_TESTING)
     "${PROJECT_SOURCE_DIR}/tests/fixtures/readable-yolov8s.model")
   set(EVR_YOLOV8_RUNTIME_CONFIG_PATH
     "${EVR_YOLOV8_PERSON_DETECTION_DIR}/configs/yolov8_person_detection.v1.example.yaml")
+  set(EVR_MULTI_STREAM_GSTREAMER_CONFIG_PATH
+    "${PROJECT_SOURCE_DIR}/configs/runtime-multi-stream-gstreamer-smoke.v1.example.yaml")
 
   add_executable(runtime_sessions_smoke_test tests/runtime_sessions_smoke_test.cpp)
   target_link_libraries(runtime_sessions_smoke_test PRIVATE evr::runtime evr::yolov8_person_detection)
@@ -149,6 +151,20 @@ if(BUILD_TESTING)
     add_test(NAME runtime_gstreamer_video_decode_smoke_test
       COMMAND runtime_gstreamer_video_decode_smoke_test)
     set_tests_properties(runtime_gstreamer_video_decode_smoke_test
+      PROPERTIES SKIP_RETURN_CODE 77)
+
+    add_executable(runtime_gstreamer_multi_stream_one_algorithm_smoke_test
+      tests/runtime_gstreamer_multi_stream_one_algorithm_smoke_test.cpp)
+    target_link_libraries(runtime_gstreamer_multi_stream_one_algorithm_smoke_test
+      PRIVATE evr::runtime evr::yolov8_person_detection)
+    evr_apply_common_settings(runtime_gstreamer_multi_stream_one_algorithm_smoke_test)
+    target_compile_definitions(runtime_gstreamer_multi_stream_one_algorithm_smoke_test
+      PRIVATE
+        "EVR_TEST_YOLOV8S_MODEL_PATH=\"${EVR_YOLOV8_MODEL_PATH}\""
+        "EVR_TEST_MULTI_STREAM_GSTREAMER_CONFIG_PATH=\"${EVR_MULTI_STREAM_GSTREAMER_CONFIG_PATH}\"")
+    add_test(NAME runtime_gstreamer_multi_stream_one_algorithm_smoke_test
+      COMMAND runtime_gstreamer_multi_stream_one_algorithm_smoke_test)
+    set_tests_properties(runtime_gstreamer_multi_stream_one_algorithm_smoke_test
       PROPERTIES SKIP_RETURN_CODE 77)
   endif()
 
