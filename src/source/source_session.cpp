@@ -7,6 +7,7 @@
 #include <cstdio>
 #include <string>
 #include <utility>
+#include <unistd.h>
 
 #if defined(EVR_WITH_GSTREAMER)
 #include <gst/app/gstappsink.h>
@@ -59,7 +60,21 @@ std::string ToLower(std::string value) {
 bool IsGStreamerDecodeMode(const std::string& decode_mode) {
   const std::string normalized = ToLower(decode_mode);
   return normalized == "gstreamer" || normalized == "gst" ||
-         normalized == "gstreamer-appsink" || normalized == "gst-appsink";
+         normalized == "gstreamer-appsink" || normalized == "gst-appsink" ||
+         normalized == "gstreamer-rgba-host" || normalized == "gst-rgba-host" ||
+         normalized == "gstreamer-nv12-nvmm-device" || normalized == "gst-nv12-nvmm-device";
+}
+
+bool IsGStreamerRgbaHostDecodeMode(const std::string& decode_mode) {
+  const std::string normalized = ToLower(decode_mode);
+  return normalized == "gstreamer" || normalized == "gst" ||
+         normalized == "gstreamer-appsink" || normalized == "gst-appsink" ||
+         normalized == "gstreamer-rgba-host" || normalized == "gst-rgba-host";
+}
+
+bool IsGStreamerNv12NvmmDeviceDecodeMode(const std::string& decode_mode) {
+  const std::string normalized = ToLower(decode_mode);
+  return normalized == "gstreamer-nv12-nvmm-device" || normalized == "gst-nv12-nvmm-device";
 }
 
 #if defined(EVR_WITH_GSTREAMER)
@@ -78,6 +93,18 @@ bool HasSoftwareH264Decoder() {
 
 bool HasJetsonHardwareDecodePath() {
   return HasElementFactory("nvv4l2decoder") && HasElementFactory("nvvidconv");
+}
+
+bool PathExists(const char* path) {
+  return access(path, F_OK) == 0;
+}
+
+bool HasJetsonDeviceRuntimePrerequisites() {
+  const bool has_nvmap = PathExists("/dev/nvmap");
+  const bool has_decode_node = PathExists("/dev/nvhost-nvdec") || PathExists("/dev/v4l-subdev0") ||
+                               PathExists("/dev/video0");
+  const bool has_vic_node = PathExists("/dev/nvhost-vic") || PathExists("/dev/nvhost-ctrl");
+  return has_nvmap && has_decode_node && has_vic_node;
 }
 #endif
 
@@ -259,10 +286,31 @@ std::vector<FrameBuffer> CaptureFramesWithGStreamer(const SourceSessionConfig& c
   }
 
   // Build pipeline. For gstreamer-testsrc, use a fully static gst_parse_launch pipeline.
-  // For RTSP on Jetson, prefer the explicit hardware path that we validate separately with
-  // runtime_gstreamer_hw_decode_probe. For everything else, keep a more generic playbin path.
+  // For RTSP on Jetson, the current host-consumed debug path prefers the explicit hardware
+  // decode chain that we validate separately with runtime_gstreamer_hw_decode_probe.
+  // The NV12/NVMM device-resident path is modeled as a separate decode_mode and intentionally
+  // returns a clear boundary error until runtime grows a device-side preprocess + tensor handoff.
   GstElement* pipeline = nullptr;
   GstElement* sink = nullptr;
+  const bool rgba_host_mode = IsGStreamerRgbaHostDecodeMode(config.decode_mode);
+  const bool nv12_nvmm_device_mode = IsGStreamerNv12NvmmDeviceDecodeMode(config.decode_mode);
+
+  if (nv12_nvmm_device_mode) {
+    if (error != nullptr) {
+      *error =
+          "decode_mode=" + config.decode_mode +
+          " is reserved for the future NV12/NVMM device-resident path; the current "
+          "SourceSession API still returns host RGBA FrameBuffer objects and does not yet "
+          "support device-side preprocess or NVMM buffer export";
+    }
+    return {};
+  }
+  if (!rgba_host_mode) {
+    if (error != nullptr) {
+      *error = "unsupported GStreamer decode mode: " + config.decode_mode;
+    }
+    return {};
+  }
 
   if (config.upstream_kind == "gstreamer-testsrc" ||
       IsGStreamerTestSourceUri(config.source_uri)) {
@@ -292,6 +340,13 @@ std::vector<FrameBuffer> CaptureFramesWithGStreamer(const SourceSessionConfig& c
     }
     sink = gst_bin_get_by_name(GST_BIN(pipeline), "evr_sink");
   } else if (IsRtspUri(config.source_uri) && HasJetsonHardwareDecodePath()) {
+    if (!HasJetsonDeviceRuntimePrerequisites()) {
+      if (error != nullptr) {
+        *error = "Jetson RTSP hardware decode prerequisites are not available in this session: "
+                 "missing /dev/nvmap or required Jetson decode/VIC device nodes";
+      }
+      return {};
+    }
     const std::string pipeline_description =
         "rtspsrc location=\"" + config.source_uri +
         "\" protocols=tcp latency=200 ! rtph264depay ! h264parse ! "

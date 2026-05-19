@@ -5,6 +5,7 @@
 #include <map>
 #include <sstream>
 #include <string>
+#include <unistd.h>
 #include <vector>
 
 #include "evr/algorithm/yolov8_person_detection/yolov8_person_detector.h"
@@ -115,6 +116,22 @@ std::string StreamIdFromSection(const std::string& section) {
   return section.substr(std::string("stream.").size());
 }
 
+bool IsRtspUri(const std::string& uri) {
+  return uri.rfind("rtsp://", 0) == 0 || uri.rfind("rtsps://", 0) == 0;
+}
+
+bool PathExists(const char* path) {
+  return access(path, F_OK) == 0;
+}
+
+bool HasJetsonDeviceRuntimePrerequisites() {
+  const bool has_nvmap = PathExists("/dev/nvmap");
+  const bool has_decode_node = PathExists("/dev/nvhost-nvdec") || PathExists("/dev/v4l-subdev0") ||
+                               PathExists("/dev/video0");
+  const bool has_vic_node = PathExists("/dev/nvhost-vic") || PathExists("/dev/nvhost-ctrl");
+  return has_nvmap && has_decode_node && has_vic_node;
+}
+
 std::string EncodeDetectionResultJson(
     const std::string& source_session_id,
     int frame_id,
@@ -178,7 +195,8 @@ int main(int argc, char** argv) {
         GetValue(sections, section, "transport_protocol", "rtsp");
     source_config.buffer_transport =
         GetValue(sections, section, "buffer_transport", "host-memory");
-    source_config.decode_mode = GetValue(sections, section, "decode_mode", "gstreamer");
+    source_config.decode_mode =
+        GetValue(sections, section, "decode_mode", "gstreamer-rgba-host");
     source_config.pixel_format = GetValue(sections, section, "pixel_format", "rgba");
     source_config.decode_timeout_seconds =
         GetIntValue(sections, section, "decode_timeout_seconds", 10);
@@ -188,6 +206,11 @@ int main(int argc, char** argv) {
       std::cerr << "stream " << stream_id << " has empty source_uri\n";
       return 1;
     }
+    if (IsRtspUri(source_config.source_uri) && !HasJetsonDeviceRuntimePrerequisites()) {
+      std::cerr << "skipping: Jetson RTSP hardware decode prerequisites are not available in "
+                   "this session\n";
+      return 77;
+    }
 
     evr::runtime::source::SourceSession source_session;
     assert(source_session.Configure(source_config));
@@ -196,6 +219,11 @@ int main(int argc, char** argv) {
     const auto frames =
         source_session.CaptureFramesFromSource(frame_width, frame_height, frame_count, &error);
     if (frames.size() != static_cast<std::size_t>(frame_count)) {
+      if (error.find("Jetson RTSP hardware decode prerequisites are not available") !=
+          std::string::npos) {
+        std::cerr << "skipping: " << error << '\n';
+        return 77;
+      }
       std::cerr << "stream " << stream_id << " failed: " << error << '\n';
       return 1;
     }

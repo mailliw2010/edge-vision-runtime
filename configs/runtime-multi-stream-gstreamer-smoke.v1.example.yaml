@@ -4,17 +4,30 @@ test:
   frame_count: 3
   inference_backend: synthetic
 
+# upstream_kind 取值说明：
+#   gstreamer-testsrc  使用 GStreamer videotestsrc 元素生成合成测试帧（SMPTE 彩条），
+#                      不需要真实摄像头，decode_mode 须为 gstreamer。
+#   direct-rtsp        ffmpeg 直连摄像头 RTSP 地址，source_uri 即为摄像头原始地址，
+#                      无需代理，是默认值。
+#   zlm-proxy          source_uri 指向 ZLMediaKit 媒体网关的播放地址，
+#                      摄像头原始地址记录在 upstream_endpoint；
+#                      ZLM 负责断线重连与缓冲，适合生产部署。
+#   file               source_uri 指向本地视频文件路径，由 ffmpeg 离线解码，
+#                      用于回放测试。
+#   synthetic          直接返回空白合成帧，不进行任何解码，
+#                      仅用于纯逻辑/算法单元测试。
+
 stream.camera-0:
-  source_uri: gst-testsrc://camera-0
-  upstream_kind: gstreamer-testsrc
+  source_uri: rtsp://FcCTveYuwknWRQCnEDLhzcFyBCpHgaUg:J6VSeTZ92wT3Lzu5@192.168.11.194/live/5d96e07e4674c1ca46fa2140098c7ccc
+  upstream_kind: direct-rtsp
   transport_protocol: in-process
   decode_mode: gstreamer
   pixel_format: rgba
   decode_timeout_seconds: 10
 
 stream.camera-1:
-  source_uri: gst-testsrc://camera-1
-  upstream_kind: gstreamer-testsrc
+  source_uri: rtsp://FcCTveYuwknWRQCnEDLhzcFyBCpHgaUg:J6VSeTZ92wT3Lzu5@192.168.11.194/live/5d96e07e4674c1ca46fa2140098c7ccc
+  upstream_kind: direct-rtsp
   transport_protocol: in-process
   decode_mode: gstreamer
   pixel_format: rgba

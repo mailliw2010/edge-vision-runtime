@@ -120,12 +120,29 @@ RTSP -> nvv4l2decoder -> nvvidconv -> appsink
 [`docs/jetson-gstreamer-hw-decode-probe.md`](docs/jetson-gstreamer-hw-decode-probe.md)。
 
 关于这条链路里每个元素在处理什么、以及为什么多路场景下通常应优先保留 NV12 而不是尽早转
-RGBA，见 [`docs/jetson-rtsp-gstreamer-pipeline-notes.md`](docs/jetson-rtsp-gstreamer-pipeline-notes.md)。
+RGBA，以及当前 `appsink` 队列深度和丢帧策略怎么理解，见
+[`docs/jetson-rtsp-gstreamer-pipeline-notes.md`](docs/jetson-rtsp-gstreamer-pipeline-notes.md)。
 
-该测试只在构建机存在 `gstreamer-1.0` 和 `gstreamer-app-1.0` 开发库时登记。它使用
-`decode_mode: gstreamer` 和内建 `gst-testsrc://` 源走 `SourceSession` 的 appsink 解码路径，
-再接同一个 YOLOv8 detector 验证结果。没有 GStreamer 开发库时，runtime 仍保留 ffmpeg
-bridge 可编译。对真实 `rtsp://` 地址，runtime 现在优先走显式 Jetson 硬解链：
+该测试只在构建机存在 `gstreamer-1.0` 和 `gstreamer-app-1.0` 开发库时登记。当前 runtime
+把 GStreamer 路径拆成两类：
+
+- `decode_mode: gstreamer-rgba-host`
+  - 当前已实现
+  - 调试 / smoke / 最小闭环路径
+  - 末端是 `appsink + gst_buffer_map + RGBA host bytes`
+- `decode_mode: gstreamer-nv12-nvmm-device`
+  - 作为生产取向路径的显式模式
+  - 当前会返回明确错误
+  - 要等 device-side preprocess / TensorRT tensor handoff 接上后再启用
+
+兼容性上，旧的 `decode_mode: gstreamer` 仍会按 `gstreamer-rgba-host` 处理。
+在缺少 Jetson `/dev/nvmap`、`/dev/nvhost-*` 等设备节点的会话里，真实 RTSP 的多路 GStreamer
+smoke 会直接跳过，而不是进入插件初始化后崩溃。
+
+当前 smoke 使用 `decode_mode: gstreamer-rgba-host` 和内建 `gst-testsrc://` 源走
+`SourceSession` 的 appsink 解码路径，再接同一个 YOLOv8 detector 验证结果。没有
+GStreamer 开发库时，runtime 仍保留 ffmpeg bridge 可编译。对真实 `rtsp://` 地址，
+`gstreamer-rgba-host` 现在优先走显式 Jetson 硬解链：
 
 ```text
 rtspsrc -> rtph264depay -> h264parse -> nvv4l2decoder -> nvvidconv -> appsink
@@ -146,7 +163,7 @@ stream.camera-main:
   source_uri: rtsp://192.168.11.198:5504/main
   upstream_kind: direct-rtsp
   transport_protocol: rtsp
-  decode_mode: gstreamer
+  decode_mode: gstreamer-rgba-host
   pixel_format: rgba
   decode_timeout_seconds: 10
 
@@ -154,7 +171,7 @@ stream.camera-sub:
   source_uri: rtsp://192.168.11.198:5504/sub
   upstream_kind: direct-rtsp
   transport_protocol: rtsp
-  decode_mode: gstreamer
+  decode_mode: gstreamer-rgba-host
   pixel_format: rgba
   decode_timeout_seconds: 10
 ```

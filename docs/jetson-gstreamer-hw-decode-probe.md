@@ -49,6 +49,13 @@ rtspsrc protocols=tcp latency=200
   -> appsink
 ```
 
+这条探针对应 runtime 里的：
+
+- `decode_mode: gstreamer-rgba-host`
+
+它验证的是“显式 Jetson 硬解链能不能出第一帧”，不是最终的 `NV12/NVMM device-resident`
+生产路径。
+
 探针成功标准：
 
 - pipeline 能进入 `PLAYING`

@@ -35,7 +35,7 @@ int main() {
   source_config.upstream_kind = "file";
   source_config.transport_protocol = "file";
   source_config.buffer_transport = "host-memory";
-  source_config.decode_mode = "gstreamer";
+  source_config.decode_mode = "gstreamer-rgba-host";
   source_config.pixel_format = "rgba";
   source_config.decode_timeout_seconds = 10;
   assert(source_session.Configure(source_config));

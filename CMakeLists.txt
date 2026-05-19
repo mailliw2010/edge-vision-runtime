@@ -159,6 +159,14 @@ if(BUILD_TESTING)
     set_tests_properties(runtime_gstreamer_video_decode_smoke_test
       PROPERTIES SKIP_RETURN_CODE 77)
 
+    add_executable(runtime_gstreamer_nv12_nvmm_device_boundary_test
+      tests/runtime_gstreamer_nv12_nvmm_device_boundary_test.cpp)
+    target_link_libraries(runtime_gstreamer_nv12_nvmm_device_boundary_test
+      PRIVATE evr::runtime evr::yolov8_person_detection)
+    evr_apply_common_settings(runtime_gstreamer_nv12_nvmm_device_boundary_test)
+    add_test(NAME runtime_gstreamer_nv12_nvmm_device_boundary_test
+      COMMAND runtime_gstreamer_nv12_nvmm_device_boundary_test)
+
     add_executable(runtime_gstreamer_multi_stream_one_algorithm_smoke_test
       tests/runtime_gstreamer_multi_stream_one_algorithm_smoke_test.cpp)
     target_link_libraries(runtime_gstreamer_multi_stream_one_algorithm_smoke_test
