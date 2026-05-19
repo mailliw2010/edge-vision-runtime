@@ -95,3 +95,6 @@ hardware decode probe succeeded for rtsp://***:***@host/path; first frame bytes=
 - TensorRT 推理性能
 - SourceSession 常驻调度
 - ZLMediaKit 代理行为
+
+更详细的链路解释和 NV12 / RGBA 的性能分析见
+[`docs/jetson-rtsp-gstreamer-pipeline-notes.md`](docs/jetson-rtsp-gstreamer-pipeline-notes.md)。
