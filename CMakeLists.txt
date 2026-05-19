@@ -141,6 +141,12 @@ if(BUILD_TESTING)
     PROPERTIES SKIP_RETURN_CODE 77)
 
   if(GSTREAMER_FOUND)
+    add_executable(runtime_gstreamer_hw_decode_probe
+      tests/runtime_gstreamer_hw_decode_probe.cpp)
+    target_link_libraries(runtime_gstreamer_hw_decode_probe
+      PRIVATE evr::runtime evr::yolov8_person_detection)
+    evr_apply_common_settings(runtime_gstreamer_hw_decode_probe)
+
     add_executable(runtime_gstreamer_video_decode_smoke_test
       tests/runtime_gstreamer_video_decode_smoke_test.cpp)
     target_link_libraries(runtime_gstreamer_video_decode_smoke_test

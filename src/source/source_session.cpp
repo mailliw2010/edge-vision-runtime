@@ -62,6 +62,12 @@ bool IsGStreamerDecodeMode(const std::string& decode_mode) {
          normalized == "gstreamer-appsink" || normalized == "gst-appsink";
 }
 
+#if defined(EVR_WITH_GSTREAMER)
+bool HasSoftwareH264Decoder() {
+  return gst_element_factory_find("avdec_h264") != nullptr;
+}
+#endif
+
 std::vector<std::uint8_t> ReadCommandBytes(const std::string& command, int* exit_status) {
   std::vector<std::uint8_t> bytes;
   FILE* pipe = popen(command.c_str(), "r");
@@ -132,17 +138,100 @@ class GstSamplePtr {
   GstSample* sample_{nullptr};
 };
 
-std::string GstEscape(const std::string& value) {
-  std::string escaped = "'";
-  for (const char ch : value) {
-    if (ch == '\'') {
-      escaped += "\\'";
-    } else {
-      escaped += ch;
+class GstMessagePtr {
+ public:
+  explicit GstMessagePtr(GstMessage* message = nullptr) : message_(message) {}
+  ~GstMessagePtr() {
+    if (message_ != nullptr) {
+      gst_message_unref(message_);
     }
   }
-  escaped += "'";
-  return escaped;
+  GstMessagePtr(const GstMessagePtr&) = delete;
+  GstMessagePtr& operator=(const GstMessagePtr&) = delete;
+  GstMessage* get() const { return message_; }
+
+ private:
+  GstMessage* message_{nullptr};
+};
+
+
+std::string ReadGStreamerBusError(GstElement* pipeline, GstClockTime timeout = 0) {
+  if (pipeline == nullptr) {
+    return {};
+  }
+
+  GstBus* bus = gst_element_get_bus(pipeline);
+  if (bus == nullptr) {
+    return {};
+  }
+  GstObjectPtr bus_owner(GST_OBJECT(bus));
+
+  GstMessagePtr message(gst_bus_timed_pop_filtered(
+      bus, timeout, static_cast<GstMessageType>(GST_MESSAGE_ERROR | GST_MESSAGE_WARNING |
+                                                GST_MESSAGE_EOS)));
+  if (message.get() == nullptr) {
+    return {};
+  }
+
+  if (GST_MESSAGE_TYPE(message.get()) == GST_MESSAGE_ERROR) {
+    GError* gst_error = nullptr;
+    gchar* debug = nullptr;
+    gst_message_parse_error(message.get(), &gst_error, &debug);
+    std::string detail = "GStreamer error";
+    if (GST_MESSAGE_SRC(message.get()) != nullptr) {
+      detail += " from ";
+      detail += GST_OBJECT_NAME(GST_MESSAGE_SRC(message.get()));
+    }
+    if (gst_error != nullptr && gst_error->message != nullptr) {
+      detail += ": ";
+      detail += gst_error->message;
+    }
+    if (debug != nullptr && debug[0] != '\0') {
+      detail += " [debug: ";
+      detail += debug;
+      detail += "]";
+    }
+    if (gst_error != nullptr) {
+      g_error_free(gst_error);
+    }
+    if (debug != nullptr) {
+      g_free(debug);
+    }
+    return detail;
+  }
+
+  if (GST_MESSAGE_TYPE(message.get()) == GST_MESSAGE_WARNING) {
+    GError* gst_error = nullptr;
+    gchar* debug = nullptr;
+    gst_message_parse_warning(message.get(), &gst_error, &debug);
+    std::string detail = "GStreamer warning";
+    if (GST_MESSAGE_SRC(message.get()) != nullptr) {
+      detail += " from ";
+      detail += GST_OBJECT_NAME(GST_MESSAGE_SRC(message.get()));
+    }
+    if (gst_error != nullptr && gst_error->message != nullptr) {
+      detail += ": ";
+      detail += gst_error->message;
+    }
+    if (debug != nullptr && debug[0] != '\0') {
+      detail += " [debug: ";
+      detail += debug;
+      detail += "]";
+    }
+    if (gst_error != nullptr) {
+      g_error_free(gst_error);
+    }
+    if (debug != nullptr) {
+      g_free(debug);
+    }
+    return detail;
+  }
+
+  if (GST_MESSAGE_TYPE(message.get()) == GST_MESSAGE_EOS) {
+    return "GStreamer reached end-of-stream before enough frames were decoded";
+  }
+
+  return {};
 }
 
 std::vector<FrameBuffer> CaptureFramesWithGStreamer(const SourceSessionConfig& config,
@@ -156,44 +245,95 @@ std::vector<FrameBuffer> CaptureFramesWithGStreamer(const SourceSessionConfig& c
     initialized = true;
   }
 
-  std::string pipeline_description;
-  if (IsGStreamerTestSourceUri(config.source_uri)) {
-    pipeline_description =
+  // Build pipeline. For gstreamer-testsrc, use a fully static gst_parse_launch pipeline.
+  // For URI-based sources (RTSP, etc.), use playbin with a programmatic video-sink:
+  // uridecodebin exposes dynamic pads that are unavailable at parse time, so chaining it
+  // with ! in gst_parse_launch fails immediately at the state-change step.
+  GstElement* pipeline = nullptr;
+  GstElement* sink = nullptr;
+
+  if (config.upstream_kind == "gstreamer-testsrc" ||
+      IsGStreamerTestSourceUri(config.source_uri)) {
+    const std::string pipeline_description =
         "videotestsrc is-live=false num-buffers=" + std::to_string(frame_count) +
         " pattern=smpte ! videoconvert ! videoscale ! video/x-raw,format=RGBA,width=" +
         std::to_string(width) + ",height=" + std::to_string(height) +
         " ! appsink name=evr_sink sync=false max-buffers=" + std::to_string(frame_count) +
         " drop=false";
-  } else {
-    pipeline_description =
-        "uridecodebin uri=" + GstEscape(config.source_uri) +
-        " ! videoconvert ! videoscale ! video/x-raw,format=RGBA,width=" +
-        std::to_string(width) + ",height=" + std::to_string(height) +
-        " ! appsink name=evr_sink sync=false max-buffers=" + std::to_string(frame_count) +
-        " drop=false";
-  }
-
-  GError* parse_error = nullptr;
-  GstElement* pipeline = gst_parse_launch(pipeline_description.c_str(), &parse_error);
-  if (pipeline == nullptr) {
-    if (error != nullptr) {
-      *error = "failed to create GStreamer pipeline";
-      if (parse_error != nullptr && parse_error->message != nullptr) {
-        *error += ": ";
-        *error += parse_error->message;
+    GError* parse_error = nullptr;
+    pipeline = gst_parse_launch(pipeline_description.c_str(), &parse_error);
+    if (pipeline == nullptr) {
+      if (error != nullptr) {
+        *error = "failed to create GStreamer pipeline";
+        if (parse_error != nullptr && parse_error->message != nullptr) {
+          *error += ": ";
+          *error += parse_error->message;
+        }
       }
+      if (parse_error != nullptr) {
+        g_error_free(parse_error);
+      }
+      return {};
     }
     if (parse_error != nullptr) {
       g_error_free(parse_error);
     }
-    return {};
+    sink = gst_bin_get_by_name(GST_BIN(pipeline), "evr_sink");
+  } else {
+#if defined(EVR_WITH_GSTREAMER)
+    if (!HasSoftwareH264Decoder()) {
+      if (error != nullptr) {
+        *error = "GStreamer RTSP decode requires a software H.264 decoder on this host; "
+                 "avdec_h264 is not available";
+      }
+      return {};
+    }
+#endif
+    pipeline = gst_element_factory_make("playbin", nullptr);
+    if (pipeline == nullptr) {
+      if (error != nullptr) {
+        *error = "failed to create GStreamer playbin element";
+      }
+      return {};
+    }
+    g_object_set(pipeline, "uri", config.source_uri.c_str(), nullptr);
+    g_object_set(pipeline, "message-forward", TRUE, nullptr);
+
+    const std::string sink_desc =
+        "videoconvert ! videoscale ! video/x-raw,format=RGBA,width=" +
+        std::to_string(width) + ",height=" + std::to_string(height) +
+        " ! appsink name=evr_sink sync=false max-buffers=" + std::to_string(frame_count) +
+        " drop=false";
+    GError* sink_err = nullptr;
+    GstElement* video_sink_bin =
+        gst_parse_bin_from_description(sink_desc.c_str(), TRUE, &sink_err);
+    if (video_sink_bin == nullptr) {
+      if (error != nullptr) {
+        *error = "failed to create GStreamer video sink";
+        if (sink_err != nullptr && sink_err->message != nullptr) {
+          *error += ": ";
+          *error += sink_err->message;
+        }
+      }
+      if (sink_err != nullptr) {
+        g_error_free(sink_err);
+      }
+      gst_object_unref(pipeline);
+      return {};
+    }
+    if (sink_err != nullptr) {
+      g_error_free(sink_err);
+    }
+    // Fetch the appsink reference from video_sink_bin before transferring ownership
+    // to playbin: once playbin owns the bin, gst_bin_get_by_name on the playbin
+    // element will not traverse into it while the pipeline is in the NULL state.
+    sink = gst_bin_get_by_name(GST_BIN(video_sink_bin), "evr_sink");
+    g_object_set(pipeline, "video-sink", video_sink_bin, nullptr);
+    gst_object_unref(video_sink_bin);
   }
-  if (parse_error != nullptr) {
-    g_error_free(parse_error);
-  }
+
   GstObjectPtr pipeline_owner(GST_OBJECT(pipeline));
 
-  GstElement* sink = gst_bin_get_by_name(GST_BIN(pipeline), "evr_sink");
   if (sink == nullptr) {
     if (error != nullptr) {
       *error = "failed to find GStreamer appsink";
@@ -206,9 +346,30 @@ std::vector<FrameBuffer> CaptureFramesWithGStreamer(const SourceSessionConfig& c
   if (state_result == GST_STATE_CHANGE_FAILURE) {
     if (error != nullptr) {
       *error = "failed to start GStreamer pipeline for " + RedactUri(config.source_uri);
+      const std::string bus_error = ReadGStreamerBusError(pipeline, 500 * GST_MSECOND);
+      if (!bus_error.empty()) {
+        *error += ": " + bus_error;
+      }
     }
     gst_element_set_state(pipeline, GST_STATE_NULL);
     return {};
+  }
+  if (state_result == GST_STATE_CHANGE_ASYNC) {
+    GstState current_state = GST_STATE_NULL;
+    GstState pending_state = GST_STATE_VOID_PENDING;
+    const GstStateChangeReturn wait_result =
+        gst_element_get_state(pipeline, &current_state, &pending_state, 5 * GST_SECOND);
+    if (wait_result == GST_STATE_CHANGE_FAILURE || current_state != GST_STATE_PLAYING) {
+      if (error != nullptr) {
+        *error = "GStreamer pipeline did not reach PLAYING for " + RedactUri(config.source_uri);
+        const std::string bus_error = ReadGStreamerBusError(pipeline, 500 * GST_MSECOND);
+        if (!bus_error.empty()) {
+          *error += ": " + bus_error;
+        }
+      }
+      gst_element_set_state(pipeline, GST_STATE_NULL);
+      return {};
+    }
   }
 
   std::vector<FrameBuffer> frames;
@@ -224,6 +385,10 @@ std::vector<FrameBuffer> CaptureFramesWithGStreamer(const SourceSessionConfig& c
       if (error != nullptr) {
         *error = "timed out pulling GStreamer frame " + std::to_string(frame_id) + " from " +
                  RedactUri(config.source_uri);
+        const std::string bus_error = ReadGStreamerBusError(pipeline);
+        if (!bus_error.empty()) {
+          *error += ": " + bus_error;
+        }
       }
       gst_element_set_state(pipeline, GST_STATE_NULL);
       return {};

@@ -103,6 +103,22 @@ ctest --output-on-failure -R runtime_gstreamer_video_decode_smoke_test
 ctest --output-on-failure -R runtime_gstreamer_multi_stream_one_algorithm_smoke_test
 ```
 
+Jetson 最小硬解链探针：
+
+```bash
+./build/runtime_gstreamer_hw_decode_probe \
+  'rtsp://user:password@camera/stream'
+```
+
+这一步只验证：
+
+```text
+RTSP -> nvv4l2decoder -> nvvidconv -> appsink
+```
+
+用途是把“Jetson 硬解环境是否成立”和“多路流 / 算法 / 事件逻辑”拆开排查。详细说明见
+[`docs/jetson-gstreamer-hw-decode-probe.md`](docs/jetson-gstreamer-hw-decode-probe.md)。
+
 该测试只在构建机存在 `gstreamer-1.0` 和 `gstreamer-app-1.0` 开发库时登记。它使用
 `decode_mode: gstreamer` 和内建 `gst-testsrc://` 源走 `SourceSession` 的 appsink 解码路径，
 再接同一个 YOLOv8 detector 验证结果。没有 GStreamer 开发库时，runtime 仍保留 ffmpeg
