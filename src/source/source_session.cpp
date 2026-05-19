@@ -63,8 +63,21 @@ bool IsGStreamerDecodeMode(const std::string& decode_mode) {
 }
 
 #if defined(EVR_WITH_GSTREAMER)
+bool HasElementFactory(const char* name) {
+  GstElementFactory* factory = gst_element_factory_find(name);
+  if (factory == nullptr) {
+    return false;
+  }
+  gst_object_unref(factory);
+  return true;
+}
+
 bool HasSoftwareH264Decoder() {
-  return gst_element_factory_find("avdec_h264") != nullptr;
+  return HasElementFactory("avdec_h264");
+}
+
+bool HasJetsonHardwareDecodePath() {
+  return HasElementFactory("nvv4l2decoder") && HasElementFactory("nvvidconv");
 }
 #endif
 
@@ -246,9 +259,8 @@ std::vector<FrameBuffer> CaptureFramesWithGStreamer(const SourceSessionConfig& c
   }
 
   // Build pipeline. For gstreamer-testsrc, use a fully static gst_parse_launch pipeline.
-  // For URI-based sources (RTSP, etc.), use playbin with a programmatic video-sink:
-  // uridecodebin exposes dynamic pads that are unavailable at parse time, so chaining it
-  // with ! in gst_parse_launch fails immediately at the state-change step.
+  // For RTSP on Jetson, prefer the explicit hardware path that we validate separately with
+  // runtime_gstreamer_hw_decode_probe. For everything else, keep a more generic playbin path.
   GstElement* pipeline = nullptr;
   GstElement* sink = nullptr;
 
@@ -279,16 +291,42 @@ std::vector<FrameBuffer> CaptureFramesWithGStreamer(const SourceSessionConfig& c
       g_error_free(parse_error);
     }
     sink = gst_bin_get_by_name(GST_BIN(pipeline), "evr_sink");
-  } else {
-#if defined(EVR_WITH_GSTREAMER)
-    if (!HasSoftwareH264Decoder()) {
+  } else if (IsRtspUri(config.source_uri) && HasJetsonHardwareDecodePath()) {
+    const std::string pipeline_description =
+        "rtspsrc location=\"" + config.source_uri +
+        "\" protocols=tcp latency=200 ! rtph264depay ! h264parse ! "
+        "nvv4l2decoder ! nvvidconv ! video/x-raw,format=RGBA,width=" +
+        std::to_string(width) + ",height=" + std::to_string(height) +
+        " ! appsink name=evr_sink sync=false max-buffers=" + std::to_string(frame_count) +
+        " drop=false";
+    GError* parse_error = nullptr;
+    pipeline = gst_parse_launch(pipeline_description.c_str(), &parse_error);
+    if (pipeline == nullptr) {
       if (error != nullptr) {
-        *error = "GStreamer RTSP decode requires a software H.264 decoder on this host; "
-                 "avdec_h264 is not available";
+        *error = "failed to create Jetson RTSP GStreamer pipeline";
+        if (parse_error != nullptr && parse_error->message != nullptr) {
+          *error += ": ";
+          *error += parse_error->message;
+        }
+      }
+      if (parse_error != nullptr) {
+        g_error_free(parse_error);
       }
       return {};
     }
-#endif
+    if (parse_error != nullptr) {
+      g_error_free(parse_error);
+    }
+    sink = gst_bin_get_by_name(GST_BIN(pipeline), "evr_sink");
+  } else {
+    if (IsRtspUri(config.source_uri) && !HasSoftwareH264Decoder()) {
+      if (error != nullptr) {
+        *error = "GStreamer RTSP decode requires either the Jetson hardware decode path "
+                 "(nvv4l2decoder + nvvidconv) or a software H.264 decoder (avdec_h264); "
+                 "neither is available";
+      }
+      return {};
+    }
     pipeline = gst_element_factory_make("playbin", nullptr);
     if (pipeline == nullptr) {
       if (error != nullptr) {

@@ -122,8 +122,13 @@ RTSP -> nvv4l2decoder -> nvvidconv -> appsink
 该测试只在构建机存在 `gstreamer-1.0` 和 `gstreamer-app-1.0` 开发库时登记。它使用
 `decode_mode: gstreamer` 和内建 `gst-testsrc://` 源走 `SourceSession` 的 appsink 解码路径，
 再接同一个 YOLOv8 detector 验证结果。没有 GStreamer 开发库时，runtime 仍保留 ffmpeg
-bridge 可编译。真实 file / RTSP URI 也会进入 GStreamer `uridecodebin` 路径，但在 Jetson
-环境上可能依赖可用的 NVIDIA 设备节点和插件配置。
+bridge 可编译。对真实 `rtsp://` 地址，runtime 现在优先走显式 Jetson 硬解链：
+
+```text
+rtspsrc -> rtph264depay -> h264parse -> nvv4l2decoder -> nvvidconv -> appsink
+```
+
+因此，真实 RTSP 的成功与否首先取决于当前会话能否访问 Jetson 的 NVIDIA 设备节点和插件运行时。
 
 多路真实 RTSP 调试建议直接改配置文件：
 
