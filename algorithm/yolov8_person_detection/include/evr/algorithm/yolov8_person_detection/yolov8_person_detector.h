@@ -36,6 +36,12 @@ class YoloV8PersonDetector {
   const AlgorithmConfig& config() const;
   bool LoadModel(std::string* error);
 
+  std::vector<float> PreprocessImage(const std::vector<std::uint8_t>& image,
+                                     int image_width,
+                                     int image_height,
+                                     const std::string& pixel_format,
+                                     std::string* error) const;
+
   std::vector<float> Preprocess(const std::vector<std::uint8_t>& rgba_image,
                                 int image_width,
                                 int image_height,
@@ -49,6 +55,12 @@ class YoloV8PersonDetector {
   std::vector<Detection> Postprocess(const std::vector<float>& raw_output,
                                      int image_width,
                                      int image_height,
+                                     std::string* error) const;
+
+  std::vector<Detection> DetectImage(const std::vector<std::uint8_t>& image,
+                                     int image_width,
+                                     int image_height,
+                                     const std::string& pixel_format,
                                      std::string* error) const;
 
   std::vector<Detection> Detect(const std::vector<std::uint8_t>& rgba_image,

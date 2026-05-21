@@ -1,3 +1,4 @@
+#include <algorithm>
 #include <cassert>
 #include <vector>
 
@@ -22,6 +23,13 @@ int main() {
   assert(!detections.empty());
   assert(detections.front().class_name == "person");
   assert(detections.front().score >= cfg.confidence_threshold);
+
+  std::vector<std::uint8_t> nv12(static_cast<std::size_t>(640) * 640 * 3U / 2U, 128U);
+  std::fill(nv12.begin(), nv12.begin() + static_cast<std::ptrdiff_t>(640 * 640), 96U);
+  const auto nv12_detections = detector.DetectImage(nv12, 640, 640, "nv12", &error);
+  assert(!nv12_detections.empty());
+  assert(nv12_detections.front().class_name == "person");
+  assert(nv12_detections.front().score >= cfg.confidence_threshold);
 
   const std::vector<float> raw_output{0.0F, 0.90F, 10.0F, 20.0F, 30.0F, 40.0F};
   const auto post = detector.Postprocess(raw_output, 640, 640, &error);

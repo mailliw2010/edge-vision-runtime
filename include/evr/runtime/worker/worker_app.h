@@ -2,6 +2,7 @@
 
 #include <string>
 
+#include "evr/runtime/observability/observe_publisher.h"
 #include "evr/runtime/source/source_session.h"
 #include "evr/runtime/worker/worker_session.h"
 
@@ -14,10 +15,17 @@ struct AlgorithmPackageConfig {
   std::string model_path{};
 };
 
+struct WorkerObservabilityConfig {
+  bool enabled{false};
+  std::string socket_path{};
+  std::string preview_dir{};
+};
+
 struct WorkerAppConfig {
   source::SourceSessionConfig source{};
   WorkerSessionConfig worker{};
   AlgorithmPackageConfig algorithm{};
+  WorkerObservabilityConfig observability{};
   bool decode_source_frames{false};
   int source_frame_width{640};
   int source_frame_height{640};

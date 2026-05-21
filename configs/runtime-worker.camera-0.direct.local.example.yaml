@@ -1,34 +1,33 @@
 source:
-  # 默认示例走 direct-rtsp，优先用于媒体栈打通、性能基线和排障。
-  # 如需走 ZLMediaKit 代理流，使用 configs/runtime-worker.zlm-proxy.v1.example.yaml。
+  # 本机直连摄像头模板。把 source_uri / upstream_endpoint 改成你的真实 RTSP。
   session_id: camera-0
-  source_uri: rtsp://camera-host/live/camera-0
+  source_uri: rtsp://<user>:<password>@192.168.11.194/live/camera-0
   upstream_kind: direct-rtsp
-  upstream_endpoint: rtsp://camera-host/live/camera-0
+  upstream_endpoint: rtsp://<user>:<password>@192.168.11.194/live/camera-0
   transport_protocol: rtsp
   buffer_transport: host-memory
   proto_version: v1
   decode_mode: gstreamer-nv12-host
   pixel_format: nv12
   decode_timeout_seconds: 60
-  decode_log_path: /tmp/evr_runtime_worker_source_ffmpeg.log
+  decode_log_path: /tmp/evr_runtime_worker_camera_0_direct.log
 
 worker:
   session_id: worker-camera-0
   supervisor_endpoint: unix:///tmp/evr-supervisor.sock
   source_session_id: camera-0
   proto_version: v1
-  inference_backend: tensorrt
-  engine_path: models/yolov8s.onnx
+  inference_backend: synthetic
+  engine_path: tests/fixtures/readable-yolov8s.model
   algorithm_name: yolov8-person-detection
   algorithm_package_uri: algorithm/yolov8_person_detection
   algorithm_entry_point: evr::algorithm::yolov8_person_detection::YoloV8PersonDetector
   algorithm_runtime_config_uri: algorithm/yolov8_person_detection/configs/yolov8_person_detection.v1.example.yaml
   input_binding: frames
   result_encoding: json
-  output_topic: events.detection
+  output_topic: events.detection.camera-0
 
 observability:
-  enabled: false
-  socket_path: /run/edge-vision/observe/runtime.sock
-  preview_dir: /run/edge-vision/observe/previews
+  enabled: true
+  socket_path: /tmp/edge-vision-observe/runtime.sock
+  preview_dir: /tmp/edge-vision-observe/previews

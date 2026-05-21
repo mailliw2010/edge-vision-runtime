@@ -1,0 +1,23 @@
+test:
+  frame_width: 640
+  frame_height: 360
+  frame_count: 3
+  inference_backend: synthetic
+
+stream.camera-0:
+  source_uri: gst-testsrc://smpte
+  upstream_kind: gstreamer-testsrc
+  transport_protocol: in-process
+  buffer_transport: host-memory
+  decode_mode: gstreamer-nv12-host
+  pixel_format: nv12
+  decode_timeout_seconds: 10
+
+stream.camera-1:
+  source_uri: gst-testsrc://smpte
+  upstream_kind: gstreamer-testsrc
+  transport_protocol: in-process
+  buffer_transport: host-memory
+  decode_mode: gstreamer-nv12-host
+  pixel_format: nv12
+  decode_timeout_seconds: 10

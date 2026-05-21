@@ -26,7 +26,9 @@ struct SourceSessionConfig {
 struct FrameBuffer {
   int width{0};
   int height{0};
-  std::vector<std::uint8_t> rgba;
+  std::string pixel_format{"rgba"};
+  std::string buffer_transport{"host-memory"};
+  std::vector<std::uint8_t> bytes;
 };
 
 class SourceSession final : public session::LifecycleSession {

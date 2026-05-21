@@ -351,12 +351,17 @@ nvv4l2decoder (NV12 in NVMM)
 当前 `SourceSession` 的 GStreamer 路径没有单独插入 `queue` 元素，也没有暴露
 “NV12 队列深度”配置项。现在真正被显式配置的是 `appsink` 内部队列。
 
-另外，runtime 里现在把 GStreamer 路径语义拆成了两类：
+另外，runtime 里现在把 GStreamer 路径语义拆成了三类：
 
 - `gstreamer-rgba-host`
   - 当前可用
   - 调试和最小闭环路径
   - 输出 `RGBA + host vector`
+- `gstreamer-nv12-host`
+  - 当前可用
+  - 过渡桥接路径
+  - 输出 `NV12 + host vector`
+  - detector 在这一路上直接做 `NV12 host -> preprocess`
 - `gstreamer-nv12-nvmm-device`
   - 作为未来生产路径的显式模式
   - 当前会直接返回明确错误
@@ -527,6 +532,15 @@ drop=true
 2. 引入 device-side preprocess
 3. 直接生成 TensorRT 输入 tensor
 4. 只在需要截图/落盘/调试时再额外导出 RGBA/JPEG
+
+最近一版已经把接口边界向前推了一步：
+
+- `FrameBuffer` 现在带 `pixel_format` / `buffer_transport` 元数据
+- detector 不再只能吃 `RGBA`
+- 算法侧已经支持 `NV12 host bytes -> preprocess -> detect`
+
+这意味着后续如果 source 侧补出 `NV12 host` 或 `NV12/NVMM` 路径，worker 和 detector
+不用再假设“所有帧都得先转成 RGBA 才能进入算法”。
 
 ## 10. 一句话结论
 

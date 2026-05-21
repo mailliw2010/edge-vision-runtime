@@ -62,6 +62,7 @@ bool IsGStreamerDecodeMode(const std::string& decode_mode) {
   return normalized == "gstreamer" || normalized == "gst" ||
          normalized == "gstreamer-appsink" || normalized == "gst-appsink" ||
          normalized == "gstreamer-rgba-host" || normalized == "gst-rgba-host" ||
+         normalized == "gstreamer-nv12-host" || normalized == "gst-nv12-host" ||
          normalized == "gstreamer-nv12-nvmm-device" || normalized == "gst-nv12-nvmm-device";
 }
 
@@ -75,6 +76,11 @@ bool IsGStreamerRgbaHostDecodeMode(const std::string& decode_mode) {
 bool IsGStreamerNv12NvmmDeviceDecodeMode(const std::string& decode_mode) {
   const std::string normalized = ToLower(decode_mode);
   return normalized == "gstreamer-nv12-nvmm-device" || normalized == "gst-nv12-nvmm-device";
+}
+
+bool IsGStreamerNv12HostDecodeMode(const std::string& decode_mode) {
+  const std::string normalized = ToLower(decode_mode);
+  return normalized == "gstreamer-nv12-host" || normalized == "gst-nv12-host";
 }
 
 #if defined(EVR_WITH_GSTREAMER)
@@ -286,26 +292,35 @@ std::vector<FrameBuffer> CaptureFramesWithGStreamer(const SourceSessionConfig& c
   }
 
   // Build pipeline. For gstreamer-testsrc, use a fully static gst_parse_launch pipeline.
-  // For RTSP on Jetson, the current host-consumed debug path prefers the explicit hardware
-  // decode chain that we validate separately with runtime_gstreamer_hw_decode_probe.
-  // The NV12/NVMM device-resident path is modeled as a separate decode_mode and intentionally
-  // returns a clear boundary error until runtime grows a device-side preprocess + tensor handoff.
+  // The current host-consumed modes are:
+  //   - gstreamer-rgba-host
+  //   - gstreamer-nv12-host
+  // For RTSP on Jetson, both prefer the explicit hardware decode chain that we validate
+  // separately with runtime_gstreamer_hw_decode_probe. The NV12/NVMM device-resident path is
+  // modeled as a separate decode_mode and intentionally returns a clear boundary error until
+  // runtime grows a device-side preprocess + tensor handoff.
   GstElement* pipeline = nullptr;
   GstElement* sink = nullptr;
   const bool rgba_host_mode = IsGStreamerRgbaHostDecodeMode(config.decode_mode);
+  const bool nv12_host_mode = IsGStreamerNv12HostDecodeMode(config.decode_mode);
   const bool nv12_nvmm_device_mode = IsGStreamerNv12NvmmDeviceDecodeMode(config.decode_mode);
+  const std::string output_pixel_format = nv12_host_mode ? "NV12" : "RGBA";
+  const std::size_t bytes_per_frame =
+      nv12_host_mode ? static_cast<std::size_t>(width) * static_cast<std::size_t>(height) * 3U / 2U
+                     : static_cast<std::size_t>(width) * static_cast<std::size_t>(height) * 4U;
+  const std::string frame_pixel_format = nv12_host_mode ? "nv12" : "rgba";
 
   if (nv12_nvmm_device_mode) {
     if (error != nullptr) {
       *error =
           "decode_mode=" + config.decode_mode +
           " is reserved for the future NV12/NVMM device-resident path; the current "
-          "SourceSession API still returns host RGBA FrameBuffer objects and does not yet "
+          "SourceSession API still exposes host-consumed FrameBuffer objects and does not yet "
           "support device-side preprocess or NVMM buffer export";
     }
     return {};
   }
-  if (!rgba_host_mode) {
+  if (!rgba_host_mode && !nv12_host_mode) {
     if (error != nullptr) {
       *error = "unsupported GStreamer decode mode: " + config.decode_mode;
     }
@@ -316,8 +331,9 @@ std::vector<FrameBuffer> CaptureFramesWithGStreamer(const SourceSessionConfig& c
       IsGStreamerTestSourceUri(config.source_uri)) {
     const std::string pipeline_description =
         "videotestsrc is-live=false num-buffers=" + std::to_string(frame_count) +
-        " pattern=smpte ! videoconvert ! videoscale ! video/x-raw,format=RGBA,width=" +
-        std::to_string(width) + ",height=" + std::to_string(height) +
+        " pattern=smpte ! videoconvert ! videoscale ! video/x-raw,format=" +
+        output_pixel_format + ",width=" + std::to_string(width) + ",height=" +
+        std::to_string(height) +
         " ! appsink name=evr_sink sync=false max-buffers=" + std::to_string(frame_count) +
         " drop=false";
     GError* parse_error = nullptr;
@@ -350,7 +366,7 @@ std::vector<FrameBuffer> CaptureFramesWithGStreamer(const SourceSessionConfig& c
     const std::string pipeline_description =
         "rtspsrc location=\"" + config.source_uri +
         "\" protocols=tcp latency=200 ! rtph264depay ! h264parse ! "
-        "nvv4l2decoder ! nvvidconv ! video/x-raw,format=RGBA,width=" +
+        "nvv4l2decoder ! nvvidconv ! video/x-raw,format=" + output_pixel_format + ",width=" +
         std::to_string(width) + ",height=" + std::to_string(height) +
         " ! appsink name=evr_sink sync=false max-buffers=" + std::to_string(frame_count) +
         " drop=false";
@@ -393,7 +409,7 @@ std::vector<FrameBuffer> CaptureFramesWithGStreamer(const SourceSessionConfig& c
     g_object_set(pipeline, "message-forward", TRUE, nullptr);
 
     const std::string sink_desc =
-        "videoconvert ! videoscale ! video/x-raw,format=RGBA,width=" +
+        "videoconvert ! videoscale ! video/x-raw,format=" + output_pixel_format + ",width=" +
         std::to_string(width) + ",height=" + std::to_string(height) +
         " ! appsink name=evr_sink sync=false max-buffers=" + std::to_string(frame_count) +
         " drop=false";
@@ -469,8 +485,7 @@ std::vector<FrameBuffer> CaptureFramesWithGStreamer(const SourceSessionConfig& c
   frames.reserve(static_cast<std::size_t>(frame_count));
   const auto timeout_ns =
       static_cast<GstClockTime>(std::max(config.decode_timeout_seconds, 1)) * GST_SECOND;
-  const std::size_t expected_bytes =
-      static_cast<std::size_t>(width) * static_cast<std::size_t>(height) * 4U;
+  const std::size_t expected_bytes = bytes_per_frame;
 
   for (int frame_id = 0; frame_id < frame_count; ++frame_id) {
     GstSamplePtr sample(gst_app_sink_try_pull_sample(GST_APP_SINK(sink), timeout_ns));
@@ -510,7 +525,9 @@ std::vector<FrameBuffer> CaptureFramesWithGStreamer(const SourceSessionConfig& c
     FrameBuffer frame;
     frame.width = width;
     frame.height = height;
-    frame.rgba.assign(map_info.data, map_info.data + expected_bytes);
+    frame.pixel_format = frame_pixel_format;
+    frame.buffer_transport = "host-memory";
+    frame.bytes.assign(map_info.data, map_info.data + expected_bytes);
     gst_buffer_unmap(buffer, &map_info);
     frames.push_back(std::move(frame));
   }
@@ -569,7 +586,9 @@ FrameBuffer SourceSession::MakeSyntheticFrame(int width, int height) const {
   FrameBuffer frame;
   frame.width = width;
   frame.height = height;
-  frame.rgba.assign(static_cast<std::size_t>(width) * static_cast<std::size_t>(height) * 4U, 127U);
+  frame.pixel_format = "rgba";
+  frame.buffer_transport = "host-memory";
+  frame.bytes.assign(static_cast<std::size_t>(width) * static_cast<std::size_t>(height) * 4U, 127U);
   return frame;
 }
 
@@ -638,7 +657,9 @@ std::vector<FrameBuffer> SourceSession::CaptureFramesFromSource(int width,
     FrameBuffer frame;
     frame.width = width;
     frame.height = height;
-    frame.rgba.assign(first, last);
+    frame.pixel_format = "rgba";
+    frame.buffer_transport = "host-memory";
+    frame.bytes.assign(first, last);
     frames.push_back(std::move(frame));
   }
   return frames;

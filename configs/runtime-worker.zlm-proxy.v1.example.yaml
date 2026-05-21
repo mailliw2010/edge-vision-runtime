@@ -1,9 +1,9 @@
 source:
-  # 默认示例走 direct-rtsp，优先用于媒体栈打通、性能基线和排障。
-  # 如需走 ZLMediaKit 代理流，使用 configs/runtime-worker.zlm-proxy.v1.example.yaml。
+  # ZLM 集成示例：runtime-worker 实际连接 ZLM 暴露的 RTSP outlet，
+  # upstream_endpoint 保留摄像头原始地址，便于编排、审计和排障。
   session_id: camera-0
-  source_uri: rtsp://camera-host/live/camera-0
-  upstream_kind: direct-rtsp
+  source_uri: rtsp://127.0.0.1:8554/live/camera-0
+  upstream_kind: zlm-proxy
   upstream_endpoint: rtsp://camera-host/live/camera-0
   transport_protocol: rtsp
   buffer_transport: host-memory

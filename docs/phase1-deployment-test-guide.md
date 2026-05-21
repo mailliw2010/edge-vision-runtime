@@ -76,9 +76,23 @@ cd projects/edge-vision-runtime
 ./build/bin/runtime-worker --config configs/runtime-worker.v1.example.yaml
 ```
 
+这里的 `configs/runtime-worker.v1.example.yaml` 默认走 `direct-rtsp`，适合做媒体栈打通、
+性能基线和直连摄像头排障。  
+如果你要验证 ZLMediaKit 代理流，改用：
+
+```bash
+cd projects/edge-vision-runtime
+./build/bin/runtime-worker --config configs/runtime-worker.zlm-proxy.v1.example.yaml
+```
+
 当前 `runtime-worker` CLI 会先跑通 source/worker 生命周期、算法配置加载、模型可读性检查、
 合成帧 Detect 和 detection 输出。真实视频文件闭环由 CTest 中的
 `runtime_file_video_detect_result_smoke_test` 覆盖，解码入口统一走 `SourceSession`。
+
+本机可直接改值的模板：
+
+- `configs/runtime-worker.camera-0.direct.local.example.yaml`
+- `configs/runtime-worker.camera-0.zlm.local.example.yaml`
 
 单路流 + 1 算法的本地可重复入口：
 
@@ -100,7 +114,10 @@ GStreamer backend 的本地可重复入口：
 
 ```bash
 ctest --output-on-failure -R runtime_gstreamer_video_decode_smoke_test
+ctest --output-on-failure -R runtime_gstreamer_nv12_host_decode_smoke_test
 ctest --output-on-failure -R runtime_gstreamer_multi_stream_one_algorithm_smoke_test
+ctest --output-on-failure -R runtime_gstreamer_nv12_host_multi_stream_one_algorithm_smoke_test
+ctest --output-on-failure -R runtime_frontend_osd_multi_stream_smoke_test
 ```
 
 Jetson 最小硬解链探针：
@@ -124,12 +141,17 @@ RGBA，以及当前 `appsink` 队列深度和丢帧策略怎么理解，见
 [`docs/jetson-rtsp-gstreamer-pipeline-notes.md`](docs/jetson-rtsp-gstreamer-pipeline-notes.md)。
 
 该测试只在构建机存在 `gstreamer-1.0` 和 `gstreamer-app-1.0` 开发库时登记。当前 runtime
-把 GStreamer 路径拆成两类：
+把 GStreamer 路径拆成三类：
 
 - `decode_mode: gstreamer-rgba-host`
   - 当前已实现
   - 调试 / smoke / 最小闭环路径
   - 末端是 `appsink + gst_buffer_map + RGBA host bytes`
+- `decode_mode: gstreamer-nv12-host`
+  - 当前已实现
+  - 过渡桥接路径
+  - 末端是 `appsink + gst_buffer_map + NV12 host bytes`
+  - 适合验证“尽量保留 NV12 到算法前处理”这件事
 - `decode_mode: gstreamer-nv12-nvmm-device`
   - 作为生产取向路径的显式模式
   - 当前会返回明确错误
@@ -139,14 +161,26 @@ RGBA，以及当前 `appsink` 队列深度和丢帧策略怎么理解，见
 在缺少 Jetson `/dev/nvmap`、`/dev/nvhost-*` 等设备节点的会话里，真实 RTSP 的多路 GStreamer
 smoke 会直接跳过，而不是进入插件初始化后崩溃。
 
+另外，当前 runtime 内部的 `FrameBuffer` 和 YOLO detector 已经不再硬绑定 `RGBA`：
+
+- `FrameBuffer` 带 `pixel_format` / `buffer_transport`
+- detector 已支持 `NV12` host 输入
+
+这为后续补 `NV12 host` 或 `NV12/NVMM` source 路径做好了算法侧接口准备。
+
 当前 smoke 使用 `decode_mode: gstreamer-rgba-host` 和内建 `gst-testsrc://` 源走
 `SourceSession` 的 appsink 解码路径，再接同一个 YOLOv8 detector 验证结果。没有
 GStreamer 开发库时，runtime 仍保留 ffmpeg bridge 可编译。对真实 `rtsp://` 地址，
-`gstreamer-rgba-host` 现在优先走显式 Jetson 硬解链：
+`gstreamer-rgba-host` 和 `gstreamer-nv12-host` 现在都优先走显式 Jetson 硬解链：
 
 ```text
 rtspsrc -> rtph264depay -> h264parse -> nvv4l2decoder -> nvvidconv -> appsink
 ```
+
+区别只在 `appsink` 前的输出 caps：
+
+- `gstreamer-rgba-host` -> `video/x-raw,format=RGBA`
+- `gstreamer-nv12-host` -> `video/x-raw,format=NV12`
 
 因此，真实 RTSP 的成功与否首先取决于当前会话能否访问 Jetson 的 NVIDIA 设备节点和插件运行时。
 
@@ -183,6 +217,29 @@ stream.camera-sub:
 ./runtime_gstreamer_multi_stream_one_algorithm_smoke_test \
   ../configs/runtime-multi-stream-gstreamer-smoke.v1.example.yaml
 ```
+
+如果你想先验证 `NV12 host -> detector` 的多路桥接路径，可直接运行：
+
+```bash
+./runtime_gstreamer_multi_stream_one_algorithm_smoke_test \
+  ../configs/runtime-multi-stream-gstreamer-nv12-host-smoke.v1.example.yaml
+```
+
+如果你想验证“前端 OSD 合约”，也就是 runtime 输出未画框预览 JPEG + 单独检测 JSON，可运行：
+
+```bash
+./runtime_frontend_osd_multi_stream_smoke_test
+```
+
+成功时会打印 `output_dir=...`，目录里每路会产出：
+
+- `frame_000.jpg`
+- `frame_000.osd.json`
+
+其中 JSON 明确标记：
+
+- `osd_mode: frontend-overlay`
+- `boxes_burned_in: false`
 
 直接 RTSP 视频源用可选 CTest 覆盖，不把带认证信息的 URL 写入仓库：
 

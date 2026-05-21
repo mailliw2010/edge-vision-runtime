@@ -134,11 +134,12 @@ bool HasJetsonDeviceRuntimePrerequisites() {
 
 std::string EncodeDetectionResultJson(
     const std::string& source_session_id,
+    const std::string& decode_backend,
     int frame_id,
     const evr::algorithm::yolov8_person_detection::Detection& detection) {
   std::ostringstream out;
   out << "{\"source_session_id\":\"" << source_session_id
-      << "\",\"decode_backend\":\"gstreamer\",\"frame_id\":" << frame_id
+      << "\",\"decode_backend\":\"" << decode_backend << "\",\"frame_id\":" << frame_id
       << ",\"class_name\":\"" << detection.class_name << "\",\"score\":" << detection.score
       << "}";
   return out.str();
@@ -177,6 +178,7 @@ int main(int argc, char** argv) {
   assert(detector.LoadModel(&error));
 
   std::size_t stream_count = 0;
+  std::string first_decode_backend;
   std::vector<std::string> encoded_results;
   for (const auto& [section, values] : sections) {
     (void)values;
@@ -197,6 +199,9 @@ int main(int argc, char** argv) {
         GetValue(sections, section, "buffer_transport", "host-memory");
     source_config.decode_mode =
         GetValue(sections, section, "decode_mode", "gstreamer-rgba-host");
+    if (first_decode_backend.empty()) {
+      first_decode_backend = source_config.decode_mode;
+    }
     source_config.pixel_format = GetValue(sections, section, "pixel_format", "rgba");
     source_config.decode_timeout_seconds =
         GetIntValue(sections, section, "decode_timeout_seconds", 10);
@@ -230,18 +235,24 @@ int main(int argc, char** argv) {
 
     for (int frame_id = 0; frame_id < frame_count; ++frame_id) {
       const auto& frame = frames[static_cast<std::size_t>(frame_id)];
-      const auto detections = detector.Detect(frame.rgba, frame.width, frame.height, &error);
+      const auto detections =
+          detector.DetectImage(frame.bytes, frame.width, frame.height, frame.pixel_format, &error);
       assert(!detections.empty());
       assert(detections.front().class_name == "person");
       encoded_results.push_back(
-          EncodeDetectionResultJson(stream_id, frame_id, detections.front()));
+          EncodeDetectionResultJson(stream_id, source_config.decode_mode, frame_id,
+                                    detections.front()));
     }
     source_session.Stop();
   }
 
   assert(stream_count >= 2U);
   assert(encoded_results.size() == stream_count * static_cast<std::size_t>(frame_count));
-  assert(encoded_results.front().find("\"decode_backend\":\"gstreamer\"") != std::string::npos);
+  assert(!first_decode_backend.empty());
+  assert(encoded_results.front().find("\"decode_backend\":\"" + first_decode_backend + "\"") !=
+         std::string::npos);
   assert(encoded_results.front().find("\"class_name\":\"person\"") != std::string::npos);
+  std::cout << "ok: streams=" << stream_count << " frames_per_stream=" << frame_count
+            << " decode_mode=" << first_decode_backend << '\n';
   return 0;
 }

@@ -47,6 +47,10 @@ struct WorkerCliOptions {
   bool has_event_store_dir{false};
   std::string event_store_dir;
   bool dump_negative_frames{false};
+  bool has_observe_socket{false};
+  std::string observe_socket;
+  bool has_observe_preview_dir{false};
+  std::string observe_preview_dir;
 };
 
 bool AssignOptionValue(const std::string& argument,
@@ -200,6 +204,18 @@ bool ParseArgs(int argc, char** argv, WorkerCliOptions* options, std::string* er
       continue;
     }
 
+    if (AssignOptionValue(argument, "--observe-socket", argc, argv, &index,
+                          &options->observe_socket, error)) {
+      options->has_observe_socket = true;
+      continue;
+    }
+
+    if (AssignOptionValue(argument, "--observe-preview-dir", argc, argv, &index,
+                          &options->observe_preview_dir, error)) {
+      options->has_observe_preview_dir = true;
+      continue;
+    }
+
     *error = "unknown argument: " + argument;
     return false;
   }
@@ -215,7 +231,8 @@ void PrintUsage() {
                "[--algorithm-package-uri URI] [--algorithm-entry-point SYMBOL] "
                "[--algorithm-runtime-config-uri URI] [--decode-source-frames] "
                "[--frame-width WIDTH] [--frame-height HEIGHT] [--frame-count COUNT] "
-               "[--dump-dir DIR] [--event-store-dir DIR] [--dump-negative-frames]\n";
+               "[--dump-dir DIR] [--event-store-dir DIR] [--dump-negative-frames] "
+               "[--observe-socket PATH] [--observe-preview-dir DIR]\n";
 }
 
 }  // namespace
@@ -301,6 +318,13 @@ int main(int argc, char** argv) {
     config.event_store_dir = options.event_store_dir;
   }
   config.dump_negative_frames = options.dump_negative_frames;
+  if (options.has_observe_socket) {
+    config.observability.enabled = true;
+    config.observability.socket_path = options.observe_socket;
+  }
+  if (options.has_observe_preview_dir) {
+    config.observability.preview_dir = options.observe_preview_dir;
+  }
   try {
     if (options.has_frame_width) {
       config.source_frame_width = std::stoi(options.frame_width);

@@ -131,8 +131,14 @@ int main() {
   evr::runtime::worker::WorkerAppConfig loaded_worker_config;
   assert(loader.LoadWorkerAppConfig((project_root / "configs/runtime-worker.v1.example.yaml").string(),
                                     &loaded_worker_config, &error));
-  assert(loaded_worker_config.source.session_id == "source-demo");
-  assert(loaded_worker_config.worker.session_id == "worker-0");
+  assert(loaded_worker_config.source.session_id == "camera-0");
+  assert(loaded_worker_config.source.upstream_kind == "direct-rtsp");
+  assert(loaded_worker_config.source.source_uri == "rtsp://camera-host/live/camera-0");
+  assert(loaded_worker_config.source.upstream_endpoint == "rtsp://camera-host/live/camera-0");
+  assert(loaded_worker_config.source.buffer_transport == "host-memory");
+  assert(loaded_worker_config.source.decode_mode == "gstreamer-nv12-host");
+  assert(loaded_worker_config.worker.session_id == "worker-camera-0");
+  assert(loaded_worker_config.worker.source_session_id == "camera-0");
   assert(loaded_worker_config.worker.algorithm_name == "yolov8-person-detection");
   assert(loaded_worker_config.worker.algorithm_package_uri == "algorithm/yolov8_person_detection");
   assert(loaded_worker_config.worker.algorithm_entry_point == "evr::algorithm::yolov8_person_detection::YoloV8PersonDetector");
@@ -142,6 +148,11 @@ int main() {
   assert(loaded_worker_config.worker.output_topic == "events.detection");
   assert(loaded_worker_config.worker.supervisor_endpoint ==
          "unix:///tmp/evr-supervisor.sock");
+  assert(!loaded_worker_config.observability.enabled);
+  assert(loaded_worker_config.observability.socket_path ==
+         "/run/edge-vision/observe/runtime.sock");
+  assert(loaded_worker_config.observability.preview_dir ==
+         "/run/edge-vision/observe/previews");
 
   return 0;
 }

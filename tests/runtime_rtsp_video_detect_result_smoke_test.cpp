@@ -334,12 +334,13 @@ int main(int argc, char** argv) {
   std::vector<std::string> encoded_results;
   for (int frame_id = 0; frame_id < frame_count; ++frame_id) {
     const auto& frame = frames[static_cast<std::size_t>(frame_id)];
-    const auto detections = detector.Detect(frame.rgba, frame.width, frame.height, &error);
+    const auto detections =
+        detector.DetectImage(frame.bytes, frame.width, frame.height, frame.pixel_format, &error);
     if (detections.empty()) {
       std::cerr << "no detections for frame " << frame_id << " with backend="
                 << algorithm_config.backend << ": " << error << '\n';
       if (save_negative_frames) {
-        assert(PersistLocalEvent(event_dir, frame_id, rtsp_uri, frame.rgba, frame.width,
+        assert(PersistLocalEvent(event_dir, frame_id, rtsp_uri, frame.bytes, frame.width,
                                  frame.height, detections, false));
       }
       continue;
@@ -349,7 +350,7 @@ int main(int argc, char** argv) {
       return 1;
     }
     encoded_results.push_back(EncodeDetectionResultJson(frame_id, rtsp_uri, detections.front()));
-    assert(PersistLocalEvent(event_dir, frame_id, rtsp_uri, frame.rgba, frame.width, frame.height,
+    assert(PersistLocalEvent(event_dir, frame_id, rtsp_uri, frame.bytes, frame.width, frame.height,
                              detections, true));
   }
 

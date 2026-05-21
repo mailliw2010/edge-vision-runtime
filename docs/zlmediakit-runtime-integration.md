@@ -69,6 +69,17 @@ curl -sS -X POST "${ZLM_API}/index/api/addStreamProxy" \
   -d 'enable_mp4=0'
 ```
 
+同样的动作也可以直接用仓库脚本：
+
+```bash
+cd ../edge-vision-ops
+./scripts/create-zlm-stream-proxy.sh \
+  --zlm-api "${ZLM_API}" \
+  --secret "${ZLM_SECRET}" \
+  --stream camera-0 \
+  --source "${CAMERA_RTSP}"
+```
+
 The expected runtime-facing URL is:
 
 ```text
@@ -176,7 +187,7 @@ explicitly enabled:
 
 ```bash
 ./build/bin/runtime-worker \
-  --config configs/runtime-worker.v1.example.yaml \
+  --config configs/runtime-worker.zlm-proxy.v1.example.yaml \
   --source-uri rtsp://127.0.0.1:8554/live/camera-198 \
   --decode-source-frames \
   --frame-width 640 \
@@ -187,6 +198,11 @@ explicitly enabled:
   --algorithm-entry-point evr::algorithm::yolov8_person_detection::YoloV8PersonDetector \
   --algorithm-runtime-config-uri "file://$(pwd)/algorithm/yolov8_person_detection/configs/yolov8_person_detection.v1.example.yaml"
 ```
+
+如果你要直接准备本机观测链，优先从这两个模板改值：
+
+- `configs/runtime-worker.camera-0.direct.local.example.yaml`
+- `configs/runtime-worker.camera-0.zlm.local.example.yaml`
 
 The production inference path uses TensorRT. For repeatable CTest smoke runs, tests override the
 algorithm backend to `synthetic`; this keeps video decode and result wiring testable without CUDA

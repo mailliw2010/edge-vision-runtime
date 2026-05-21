@@ -4,6 +4,7 @@ project(edge_vision_runtime VERSION 0.1.0 LANGUAGES CXX)
 include(GNUInstallDirs)
 include(CTest)
 find_package(PkgConfig)
+find_package(Threads REQUIRED)
 
 option(EVR_ENABLE_INSTALL "Enable install targets" ON)
 
@@ -15,6 +16,7 @@ set(EVR_RUNTIME_HEADERS
   include/evr/runtime/config/runtime_config_loader.h
   include/evr/runtime/deployment/phase1_deployment.h
   include/evr/runtime/graph/graph.h
+  include/evr/runtime/observability/observe_publisher.h
   include/evr/runtime/session/lifecycle_session.h
   include/evr/runtime/session/session_state.h
   include/evr/runtime/source/source_app.h
@@ -28,6 +30,7 @@ set(EVR_RUNTIME_SOURCES
   src/config/runtime_config_loader.cpp
   src/deployment/phase1_deployment.cpp
   src/graph/graph.cpp
+  src/observability/observe_publisher.cpp
   src/session/session_state.cpp
   src/source/source_app.cpp
   src/source/source_session.cpp
@@ -107,11 +110,31 @@ if(BUILD_TESTING)
     "${EVR_YOLOV8_PERSON_DETECTION_DIR}/configs/yolov8_person_detection.v1.example.yaml")
   set(EVR_MULTI_STREAM_GSTREAMER_CONFIG_PATH
     "${PROJECT_SOURCE_DIR}/configs/runtime-multi-stream-gstreamer-smoke.v1.example.yaml")
+  set(EVR_MULTI_STREAM_GSTREAMER_NV12_HOST_CONFIG_PATH
+    "${PROJECT_SOURCE_DIR}/configs/runtime-multi-stream-gstreamer-nv12-host-smoke.v1.example.yaml")
 
   add_executable(runtime_sessions_smoke_test tests/runtime_sessions_smoke_test.cpp)
   target_link_libraries(runtime_sessions_smoke_test PRIVATE evr::runtime evr::yolov8_person_detection)
   evr_apply_common_settings(runtime_sessions_smoke_test)
   add_test(NAME runtime_sessions_smoke_test COMMAND runtime_sessions_smoke_test)
+
+  add_executable(runtime_observability_ndjson_smoke_test
+    tests/runtime_observability_ndjson_smoke_test.cpp)
+  target_link_libraries(runtime_observability_ndjson_smoke_test
+    PRIVATE evr::runtime evr::yolov8_person_detection Threads::Threads)
+  evr_apply_common_settings(runtime_observability_ndjson_smoke_test)
+  add_test(NAME runtime_observability_ndjson_smoke_test
+    COMMAND runtime_observability_ndjson_smoke_test)
+
+  add_executable(runtime_worker_observability_publish_smoke_test
+    tests/runtime_worker_observability_publish_smoke_test.cpp)
+  target_link_libraries(runtime_worker_observability_publish_smoke_test
+    PRIVATE evr::runtime evr::yolov8_person_detection Threads::Threads)
+  evr_apply_common_settings(runtime_worker_observability_publish_smoke_test)
+  target_compile_definitions(runtime_worker_observability_publish_smoke_test
+    PRIVATE "EVR_TEST_YOLOV8S_MODEL_PATH=\"${EVR_YOLOV8_MODEL_PATH}\"")
+  add_test(NAME runtime_worker_observability_publish_smoke_test
+    COMMAND runtime_worker_observability_publish_smoke_test)
 
   add_executable(runtime_worker_algorithm_loading_smoke_test tests/runtime_worker_algorithm_loading_smoke_test.cpp)
   target_link_libraries(runtime_worker_algorithm_loading_smoke_test PRIVATE evr::yolov8_person_detection)
@@ -159,6 +182,18 @@ if(BUILD_TESTING)
     set_tests_properties(runtime_gstreamer_video_decode_smoke_test
       PROPERTIES SKIP_RETURN_CODE 77)
 
+    add_executable(runtime_gstreamer_nv12_host_decode_smoke_test
+      tests/runtime_gstreamer_nv12_host_decode_smoke_test.cpp)
+    target_link_libraries(runtime_gstreamer_nv12_host_decode_smoke_test
+      PRIVATE evr::runtime evr::yolov8_person_detection)
+    evr_apply_common_settings(runtime_gstreamer_nv12_host_decode_smoke_test)
+    target_compile_definitions(runtime_gstreamer_nv12_host_decode_smoke_test
+      PRIVATE "EVR_TEST_YOLOV8S_MODEL_PATH=\"${EVR_YOLOV8_MODEL_PATH}\"")
+    add_test(NAME runtime_gstreamer_nv12_host_decode_smoke_test
+      COMMAND runtime_gstreamer_nv12_host_decode_smoke_test)
+    set_tests_properties(runtime_gstreamer_nv12_host_decode_smoke_test
+      PROPERTIES SKIP_RETURN_CODE 77)
+
     add_executable(runtime_gstreamer_nv12_nvmm_device_boundary_test
       tests/runtime_gstreamer_nv12_nvmm_device_boundary_test.cpp)
     target_link_libraries(runtime_gstreamer_nv12_nvmm_device_boundary_test
@@ -179,6 +214,26 @@ if(BUILD_TESTING)
     add_test(NAME runtime_gstreamer_multi_stream_one_algorithm_smoke_test
       COMMAND runtime_gstreamer_multi_stream_one_algorithm_smoke_test)
     set_tests_properties(runtime_gstreamer_multi_stream_one_algorithm_smoke_test
+      PROPERTIES SKIP_RETURN_CODE 77)
+
+    add_test(NAME runtime_gstreamer_nv12_host_multi_stream_one_algorithm_smoke_test
+      COMMAND runtime_gstreamer_multi_stream_one_algorithm_smoke_test
+              ${EVR_MULTI_STREAM_GSTREAMER_NV12_HOST_CONFIG_PATH})
+    set_tests_properties(runtime_gstreamer_nv12_host_multi_stream_one_algorithm_smoke_test
+      PROPERTIES SKIP_RETURN_CODE 77)
+
+    add_executable(runtime_frontend_osd_multi_stream_smoke_test
+      tests/runtime_frontend_osd_multi_stream_smoke_test.cpp)
+    target_link_libraries(runtime_frontend_osd_multi_stream_smoke_test
+      PRIVATE evr::runtime evr::yolov8_person_detection)
+    evr_apply_common_settings(runtime_frontend_osd_multi_stream_smoke_test)
+    target_compile_definitions(runtime_frontend_osd_multi_stream_smoke_test
+      PRIVATE
+        "EVR_TEST_YOLOV8S_MODEL_PATH=\"${EVR_YOLOV8_MODEL_PATH}\""
+        "EVR_TEST_MULTI_STREAM_GSTREAMER_NV12_HOST_CONFIG_PATH=\"${EVR_MULTI_STREAM_GSTREAMER_NV12_HOST_CONFIG_PATH}\"")
+    add_test(NAME runtime_frontend_osd_multi_stream_smoke_test
+      COMMAND runtime_frontend_osd_multi_stream_smoke_test)
+    set_tests_properties(runtime_frontend_osd_multi_stream_smoke_test
       PROPERTIES SKIP_RETURN_CODE 77)
   endif()
 

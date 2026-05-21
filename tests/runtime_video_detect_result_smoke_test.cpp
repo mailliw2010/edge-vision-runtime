@@ -67,7 +67,8 @@ int main() {
   std::vector<std::string> encoded_results;
   for (int frame_id = 0; frame_id < 3; ++frame_id) {
     const auto frame = source_session.MakeSyntheticFrame(640, 640);
-    const auto detections = detector.Detect(frame.rgba, frame.width, frame.height, &error);
+    const auto detections =
+        detector.DetectImage(frame.bytes, frame.width, frame.height, frame.pixel_format, &error);
     assert(!detections.empty());
     assert(detections.front().class_name == "person");
     assert(detections.front().score >= algorithm_config.confidence_threshold);

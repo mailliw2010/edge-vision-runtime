@@ -55,6 +55,49 @@ bool IsSyntheticBackend(const std::string& backend) {
          normalized == "onnxruntime" || normalized == "onnxruntime-smoke";
 }
 
+bool IsRgbaPixelFormat(const std::string& pixel_format) {
+  const auto normalized = Lower(pixel_format);
+  return normalized == "rgba" || normalized == "rgbx";
+}
+
+bool IsNv12PixelFormat(const std::string& pixel_format) {
+  return Lower(pixel_format) == "nv12";
+}
+
+int ClampByte(int value) {
+  return std::max(0, std::min(value, 255));
+}
+
+void Nv12PixelToRgb(const std::vector<std::uint8_t>& nv12,
+                    int image_width,
+                    int image_height,
+                    int x,
+                    int y,
+                    float* r,
+                    float* g,
+                    float* b) {
+  const std::size_t y_index =
+      static_cast<std::size_t>(y) * static_cast<std::size_t>(image_width) + x;
+  const std::size_t uv_plane_offset =
+      static_cast<std::size_t>(image_width) * static_cast<std::size_t>(image_height);
+  const std::size_t uv_index =
+      uv_plane_offset + static_cast<std::size_t>(y / 2) * static_cast<std::size_t>(image_width) +
+      static_cast<std::size_t>(x / 2) * 2U;
+
+  const int y_value = static_cast<int>(nv12[y_index]);
+  const int u_value = static_cast<int>(nv12[uv_index + 0U]);
+  const int v_value = static_cast<int>(nv12[uv_index + 1U]);
+  const int c = std::max(0, y_value - 16);
+  const int d = u_value - 128;
+  const int e = v_value - 128;
+  const int red = ClampByte((298 * c + 409 * e + 128) >> 8);
+  const int green = ClampByte((298 * c - 100 * d - 208 * e + 128) >> 8);
+  const int blue = ClampByte((298 * c + 516 * d + 128) >> 8);
+  *r = static_cast<float>(red) / 255.0F;
+  *g = static_cast<float>(green) / 255.0F;
+  *b = static_cast<float>(blue) / 255.0F;
+}
+
 std::string ShellQuote(const std::string& value) {
   std::string quoted = "'";
   for (const char ch : value) {
@@ -333,21 +376,14 @@ bool YoloV8PersonDetector::LoadModel(std::string* error) {
 #endif
 }
 
-std::vector<float> YoloV8PersonDetector::Preprocess(const std::vector<std::uint8_t>& rgba_image,
-                                                    int image_width,
-                                                    int image_height,
-                                                    std::string* error) const {
+std::vector<float> YoloV8PersonDetector::PreprocessImage(const std::vector<std::uint8_t>& image,
+                                                         int image_width,
+                                                         int image_height,
+                                                         const std::string& pixel_format,
+                                                         std::string* error) const {
   if (image_width <= 0 || image_height <= 0) {
     if (error != nullptr) {
       *error = "invalid image size";
-    }
-    return {};
-  }
-  const std::size_t expected = static_cast<std::size_t>(image_width) *
-                               static_cast<std::size_t>(image_height) * 4U;
-  if (rgba_image.size() < expected) {
-    if (error != nullptr) {
-      *error = "rgba image buffer is too small";
     }
     return {};
   }
@@ -356,22 +392,71 @@ std::vector<float> YoloV8PersonDetector::Preprocess(const std::vector<std::uint8
                                  static_cast<std::size_t>(config_.input_height);
   std::vector<float> tensor(plane_size * 3U);
 
-  for (int y = 0; y < config_.input_height; ++y) {
-    const int src_y = y * image_height / config_.input_height;
-    for (int x = 0; x < config_.input_width; ++x) {
-      const int src_x = x * image_width / config_.input_width;
-      const std::size_t index = (static_cast<std::size_t>(src_y) * image_width + src_x) * 4U;
-      const std::size_t dst = static_cast<std::size_t>(y) * config_.input_width + x;
-      const float r = rgba_image[index + 0] / 255.0F;
-      const float g = rgba_image[index + 1] / 255.0F;
-      const float b = rgba_image[index + 2] / 255.0F;
-      tensor[dst] = r;
-      tensor[plane_size + dst] = g;
-      tensor[plane_size * 2U + dst] = b;
+  if (IsRgbaPixelFormat(pixel_format)) {
+    const std::size_t expected = static_cast<std::size_t>(image_width) *
+                                 static_cast<std::size_t>(image_height) * 4U;
+    if (image.size() < expected) {
+      if (error != nullptr) {
+        *error = "rgba image buffer is too small";
+      }
+      return {};
     }
+
+    for (int y = 0; y < config_.input_height; ++y) {
+      const int src_y = y * image_height / config_.input_height;
+      for (int x = 0; x < config_.input_width; ++x) {
+        const int src_x = x * image_width / config_.input_width;
+        const std::size_t index = (static_cast<std::size_t>(src_y) * image_width + src_x) * 4U;
+        const std::size_t dst = static_cast<std::size_t>(y) * config_.input_width + x;
+        const float r = image[index + 0] / 255.0F;
+        const float g = image[index + 1] / 255.0F;
+        const float b = image[index + 2] / 255.0F;
+        tensor[dst] = r;
+        tensor[plane_size + dst] = g;
+        tensor[plane_size * 2U + dst] = b;
+      }
+    }
+    return tensor;
   }
 
-  return tensor;
+  if (IsNv12PixelFormat(pixel_format)) {
+    const std::size_t expected = static_cast<std::size_t>(image_width) *
+                                 static_cast<std::size_t>(image_height) * 3U / 2U;
+    if (image.size() < expected) {
+      if (error != nullptr) {
+        *error = "nv12 image buffer is too small";
+      }
+      return {};
+    }
+
+    for (int y = 0; y < config_.input_height; ++y) {
+      const int src_y = y * image_height / config_.input_height;
+      for (int x = 0; x < config_.input_width; ++x) {
+        const int src_x = x * image_width / config_.input_width;
+        const std::size_t dst = static_cast<std::size_t>(y) * config_.input_width + x;
+        float r = 0.0F;
+        float g = 0.0F;
+        float b = 0.0F;
+        Nv12PixelToRgb(image, image_width, image_height, src_x, src_y, &r, &g, &b);
+        tensor[dst] = r;
+        tensor[plane_size + dst] = g;
+        tensor[plane_size * 2U + dst] = b;
+      }
+    }
+    return tensor;
+  }
+
+  if (error != nullptr) {
+    *error = "unsupported pixel format for preprocess: " + pixel_format;
+  }
+  return {};
+}
+
+std::vector<float> YoloV8PersonDetector::Preprocess(const std::vector<std::uint8_t>& rgba_image,
+                                                    int image_width,
+                                                    int image_height,
+                                                    std::string* error) const {
+  return PreprocessImage(rgba_image, image_width, image_height, "rgba", error);
 }
 
 std::vector<Detection> YoloV8PersonDetector::Infer(const std::vector<float>& input,
@@ -550,11 +635,12 @@ std::vector<Detection> YoloV8PersonDetector::Postprocess(const std::vector<float
   return ApplyNms(std::move(candidates), config_.nms_threshold);
 }
 
-std::vector<Detection> YoloV8PersonDetector::Detect(const std::vector<std::uint8_t>& rgba_image,
-                                                    int image_width,
-                                                    int image_height,
-                                                    std::string* error) const {
-  auto tensor = Preprocess(rgba_image, image_width, image_height, error);
+std::vector<Detection> YoloV8PersonDetector::DetectImage(const std::vector<std::uint8_t>& image,
+                                                         int image_width,
+                                                         int image_height,
+                                                         const std::string& pixel_format,
+                                                         std::string* error) const {
+  auto tensor = PreprocessImage(image, image_width, image_height, pixel_format, error);
   if (tensor.empty()) {
     return {};
   }
@@ -563,6 +649,13 @@ std::vector<Detection> YoloV8PersonDetector::Detect(const std::vector<std::uint8
     return {};
   }
   return detections;
+}
+
+std::vector<Detection> YoloV8PersonDetector::Detect(const std::vector<std::uint8_t>& rgba_image,
+                                                    int image_width,
+                                                    int image_height,
+                                                    std::string* error) const {
+  return DetectImage(rgba_image, image_width, image_height, "rgba", error);
 }
 
 }  // namespace evr::algorithm::yolov8_person_detection

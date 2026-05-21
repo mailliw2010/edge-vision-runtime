@@ -123,6 +123,23 @@ int GetIntValue(const SectionMap& sections,
   }
 }
 
+bool GetBoolValue(const SectionMap& sections,
+                  const std::string& section,
+                  const std::string& key,
+                  bool fallback) {
+  const std::string value = GetValue(sections, section, key, "");
+  if (value.empty()) {
+    return fallback;
+  }
+  if (value == "true" || value == "1" || value == "yes" || value == "on") {
+    return true;
+  }
+  if (value == "false" || value == "0" || value == "no" || value == "off") {
+    return false;
+  }
+  return fallback;
+}
+
 void FillSupervisorSessionConfig(const SectionMap& sections,
                                  supervisor::SupervisorSessionConfig* config) {
   config->session_id = GetValue(sections, "supervisor", "session_id", config->session_id);
@@ -173,6 +190,15 @@ void FillWorkerSessionConfig(const SectionMap& sections, worker::WorkerSessionCo
   config->result_encoding =
       GetValue(sections, "worker", "result_encoding", config->result_encoding);
   config->output_topic = GetValue(sections, "worker", "output_topic", config->output_topic);
+}
+
+void FillWorkerObservabilityConfig(const SectionMap& sections,
+                                   worker::WorkerObservabilityConfig* config) {
+  config->enabled = GetBoolValue(sections, "observability", "enabled", config->enabled);
+  config->socket_path =
+      GetValue(sections, "observability", "socket_path", config->socket_path);
+  config->preview_dir =
+      GetValue(sections, "observability", "preview_dir", config->preview_dir);
 }
 
 void FillPhase1DeploymentSpec(const SectionMap& sections,
@@ -261,6 +287,7 @@ bool RuntimeConfigLoader::LoadWorkerAppConfig(const std::string& file_path,
 
   FillSourceSessionConfig(sections, &config->source);
   FillWorkerSessionConfig(sections, &config->worker);
+  FillWorkerObservabilityConfig(sections, &config->observability);
   return true;
 }
 
