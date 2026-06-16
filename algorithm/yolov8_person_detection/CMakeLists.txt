@@ -17,12 +17,22 @@ set_target_properties(evr_yolov8_person_detection PROPERTIES
   POSITION_INDEPENDENT_CODE ON)
 
 find_path(EVR_TENSORRT_INCLUDE_DIR NvInfer.h
-  PATHS /usr/include/aarch64-linux-gnu /usr/include /usr/local/include)
+  PATHS
+    /usr/include/x86_64-linux-gnu
+    /usr/include/aarch64-linux-gnu
+    /usr/include
+    /usr/local/include)
 find_path(EVR_CUDA_INCLUDE_DIR cuda_runtime_api.h
-  PATHS /usr/local/cuda/include /usr/local/cuda/targets/aarch64-linux/include)
+  PATHS
+    /usr/local/cuda/include
+    /usr/local/cuda/targets/x86_64-linux/include
+    /usr/local/cuda/targets/aarch64-linux/include)
 find_library(EVR_TENSORRT_NVINFER_LIBRARY nvinfer)
 find_library(EVR_TENSORRT_CUDART_LIBRARY cudart
-  PATHS /usr/local/cuda/lib64 /usr/local/cuda/targets/aarch64-linux/lib)
+  PATHS
+    /usr/local/cuda/lib64
+    /usr/local/cuda/targets/x86_64-linux/lib
+    /usr/local/cuda/targets/aarch64-linux/lib)
 find_package(PkgConfig QUIET)
 if(PkgConfig_FOUND)
   pkg_check_modules(EVR_LIBJPEG QUIET libjpeg)

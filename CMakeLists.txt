@@ -52,6 +52,14 @@ function(evr_apply_common_settings target)
   else()
     target_compile_options(${target} PRIVATE -Wall -Wextra -Wpedantic)
   endif()
+
+  if(target MATCHES "_test$")
+    if(MSVC)
+      target_compile_definitions(${target} PRIVATE _DEBUG)
+    else()
+      target_compile_options(${target} PRIVATE -UNDEBUG)
+    endif()
+  endif()
 endfunction()
 
 add_library(evr_runtime STATIC

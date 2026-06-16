@@ -9,6 +9,7 @@
 
 # Local build and package artifacts.
 cmake-build-*/
+build-conda
 out/
 dist/
 *.dll
