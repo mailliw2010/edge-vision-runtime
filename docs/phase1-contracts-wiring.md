@@ -1,49 +1,54 @@
 # phase-1 contracts wiring for runtime
 
-当前阶段，Runtime 与 contracts 的接线采用两步策略：
+当前阶段，Runtime 与 contracts 的接线策略已经收敛为：control-plane 用 Go 实现，runtime 的 gRPC control surface 由 C++ runtime 进程直接实现。
 
-## 第一步（当前阶段）
+## 当前阶段
 
 - 先冻结 `edge-vision-contracts` 的 proto v1 骨架
 - Runtime 继续维护自身最小可编译骨架
-- 在 Runtime 内引入 **phase-1 bridge** 的概念，把 contracts 里的概念映射到：
+- 在 Runtime 内引入 **phase-1 bridge** 的概念，把 contracts 里的概念直接映射到 C++：
   - `SupervisorApp`
   - `Phase1DeploymentSpec`
   - `SourceSession`
   - `WorkerSession`
+- C++ runtime 直接实现 `runtime.v1.SupervisorService`：
+  - `Handshake`
+  - `ApplyDeployment`
+  - `StopDeployment`
+  - `GetSupervisorStatus`
+  - `GetDeploymentStatus`
 
 这一阶段的目标是：
 
 - control-plane 已能围绕 contracts 编译与组织请求
 - runtime 已能围绕 phase-1 deployment wiring 稳定表达其本地关系
-- 不急于把 C++ 端的 proto/gRPC 生成、链接、ABI 细节一次性全部推上来
+- runtime 通过可选 CMake 开关 `EVR_ENABLE_GRPC=ON` 生成并链接 C++ proto/gRPC stub
 
-## 第二步（下一阶段）
+## 不采用 Go runtime shim
 
-- 再把 Runtime 的 control surface 收敛到 contracts 的 runtime/v1 上
-- 逐步引入：
-  - ApplyDeployment
-  - GetSupervisorStatus
-  - GetDeploymentStatus
-- 再视情况决定：
-  - C++ 代码生成策略
-  - 生成物是否入仓
-  - gRPC / IPC 的承接方式
+runtime 内不引入 Go supervisor shim。边界固定为：
+
+```text
+control-plane (Go)
+  -> gRPC / protobuf
+runtime-supervisor (C++)
+  -> C++ source / worker / graph
+```
+
+这样做的原因：
+
+- 少一层 Go supervisor -> C++ worker 的内部协议。
+- `ApplyDeploymentRequest.ExecutionRequest` 可以直接进入 C++ runtime 的部署规范和 graph wiring。
+- GStreamer / TensorRT / 帧级数据面不跨语言边界。
+- C++ runtime 进程天然拥有 source / worker / graph 的生命周期，直接实现 gRPC server 更符合所有权边界。
 
 ## 原因
 
 Jetson / GStreamer / TensorRT 这条线本来就足够复杂。
-如果在当前阶段把：
+如果把 Go shim 放在 runtime 侧，会额外引入：
 
-- contracts 调整
-- C++ proto 生成
-- gRPC 接线
-- Runtime 本地 wiring
+- Go -> C++ 的内部启动/停止/状态协议
+- control-plane proto 到内部协议的二次翻译
+- 两套进程生命周期和错误语义
 
-同时做深，返工风险会明显变高。
-
-所以当前推荐：
-
-> 先让 control-plane 吃 contracts，
-> Runtime 先通过 phase-1 bridge 对齐 contracts 语义，
-> 再进入真实接线。
+这些复杂度并不会减少 runtime 的 C++ 数据面复杂度。因此当前推荐 C++ runtime 直接承接 gRPC control surface。

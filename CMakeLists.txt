@@ -7,6 +7,7 @@ find_package(PkgConfig)
 find_package(Threads REQUIRED)
 
 option(EVR_ENABLE_INSTALL "Enable install targets" ON)
+option(EVR_ENABLE_GRPC "Build runtime gRPC control surface" OFF)
 
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -22,6 +23,7 @@ set(EVR_RUNTIME_HEADERS
   include/evr/runtime/source/source_app.h
   include/evr/runtime/source/source_session.h
   include/evr/runtime/supervisor/supervisor_app.h
+  include/evr/runtime/supervisor/supervisor_grpc_service.h
   include/evr/runtime/supervisor/supervisor_session.h
   include/evr/runtime/worker/worker_app.h
   include/evr/runtime/worker/worker_session.h)
@@ -35,9 +37,17 @@ set(EVR_RUNTIME_SOURCES
   src/source/source_app.cpp
   src/source/source_session.cpp
   src/supervisor/supervisor_app.cpp
+  src/supervisor/supervisor_grpc_service.cpp
   src/supervisor/supervisor_session.cpp
   src/worker/worker_app.cpp
   src/worker/worker_session.cpp)
+
+if(NOT EVR_ENABLE_GRPC)
+  list(REMOVE_ITEM EVR_RUNTIME_HEADERS
+    include/evr/runtime/supervisor/supervisor_grpc_service.h)
+  list(REMOVE_ITEM EVR_RUNTIME_SOURCES
+    src/supervisor/supervisor_grpc_service.cpp)
+endif()
 
 function(evr_apply_common_settings target)
   target_compile_features(${target} PUBLIC cxx_std_17)
@@ -79,6 +89,66 @@ if(GSTREAMER_FOUND)
   target_link_libraries(evr_runtime PUBLIC ${GSTREAMER_LIBRARIES})
 endif()
 
+if(EVR_ENABLE_GRPC)
+  find_package(Protobuf REQUIRED)
+  find_package(gRPC CONFIG QUIET)
+
+  if(NOT TARGET gRPC::grpc++)
+    if(PkgConfig_FOUND)
+      pkg_check_modules(GRPCPP REQUIRED grpc++)
+    endif()
+  endif()
+
+  find_program(PROTOC_EXECUTABLE protoc REQUIRED)
+  find_program(GRPC_CPP_PLUGIN_EXECUTABLE grpc_cpp_plugin REQUIRED)
+
+  set(EVR_CONTRACTS_PROTO_DIR "${PROJECT_SOURCE_DIR}/../edge-vision-contracts/proto")
+  set(EVR_CONTRACTS_PROTO_FILES
+    "${EVR_CONTRACTS_PROTO_DIR}/common/v1/common.proto"
+    "${EVR_CONTRACTS_PROTO_DIR}/runtime/v1/runtime.proto")
+  set(EVR_GENERATED_PROTO_DIR "${CMAKE_BINARY_DIR}/generated/contracts")
+  set(EVR_GENERATED_PROTO_SOURCES
+    "${EVR_GENERATED_PROTO_DIR}/common/v1/common.pb.cc"
+    "${EVR_GENERATED_PROTO_DIR}/runtime/v1/runtime.pb.cc"
+    "${EVR_GENERATED_PROTO_DIR}/runtime/v1/runtime.grpc.pb.cc")
+  set(EVR_GENERATED_PROTO_HEADERS
+    "${EVR_GENERATED_PROTO_DIR}/common/v1/common.pb.h"
+    "${EVR_GENERATED_PROTO_DIR}/runtime/v1/runtime.pb.h"
+    "${EVR_GENERATED_PROTO_DIR}/runtime/v1/runtime.grpc.pb.h")
+
+  add_custom_command(
+    OUTPUT ${EVR_GENERATED_PROTO_SOURCES} ${EVR_GENERATED_PROTO_HEADERS}
+    COMMAND ${CMAKE_COMMAND} -E make_directory
+            "${EVR_GENERATED_PROTO_DIR}/common/v1"
+            "${EVR_GENERATED_PROTO_DIR}/runtime/v1"
+    COMMAND ${PROTOC_EXECUTABLE}
+            --proto_path="${EVR_CONTRACTS_PROTO_DIR}"
+            --cpp_out="${EVR_GENERATED_PROTO_DIR}"
+            --grpc_out="${EVR_GENERATED_PROTO_DIR}"
+            --plugin=protoc-gen-grpc="${GRPC_CPP_PLUGIN_EXECUTABLE}"
+            ${EVR_CONTRACTS_PROTO_FILES}
+    DEPENDS ${EVR_CONTRACTS_PROTO_FILES}
+    COMMENT "Generating C++ gRPC contracts for runtime")
+
+  add_library(evr_runtime_contracts STATIC
+    ${EVR_GENERATED_PROTO_SOURCES}
+    ${EVR_GENERATED_PROTO_HEADERS})
+  add_library(evr::runtime_contracts ALIAS evr_runtime_contracts)
+  target_include_directories(evr_runtime_contracts PUBLIC "${EVR_GENERATED_PROTO_DIR}")
+
+  if(TARGET gRPC::grpc++)
+    target_link_libraries(evr_runtime_contracts PUBLIC gRPC::grpc++ protobuf::libprotobuf)
+  else()
+    target_include_directories(evr_runtime_contracts PUBLIC ${GRPCPP_INCLUDE_DIRS})
+    target_link_directories(evr_runtime_contracts PUBLIC ${GRPCPP_LIBRARY_DIRS})
+    target_link_libraries(evr_runtime_contracts PUBLIC ${GRPCPP_LIBRARIES} protobuf::libprotobuf)
+  endif()
+
+  target_include_directories(evr_runtime PUBLIC "${EVR_GENERATED_PROTO_DIR}")
+  target_link_libraries(evr_runtime PUBLIC evr::runtime_contracts)
+  target_compile_definitions(evr_runtime PUBLIC EVR_WITH_GRPC=1)
+endif()
+
 evr_apply_common_settings(evr_runtime)
 set_target_properties(evr_runtime PROPERTIES
   OUTPUT_NAME evr_runtime
@@ -98,8 +168,16 @@ evr_add_runtime_binary(runtime-supervisor cmd/runtime-supervisor/main.cpp)
 evr_add_runtime_binary(runtime-source cmd/runtime-source/main.cpp)
 evr_add_runtime_binary(runtime-worker cmd/runtime-worker/main.cpp)
 
+if(EVR_ENABLE_GRPC)
+  evr_add_runtime_binary(runtime-grpc-supervisor cmd/runtime-grpc-supervisor/main.cpp)
+endif()
+
 if(EVR_ENABLE_INSTALL)
-  install(TARGETS evr_runtime runtime-supervisor runtime-source runtime-worker
+  set(EVR_INSTALL_TARGETS evr_runtime runtime-supervisor runtime-source runtime-worker)
+  if(EVR_ENABLE_GRPC)
+    list(APPEND EVR_INSTALL_TARGETS runtime-grpc-supervisor evr_runtime_contracts)
+  endif()
+  install(TARGETS ${EVR_INSTALL_TARGETS}
     RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR}
     ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR}
     LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR})
@@ -125,6 +203,16 @@ if(BUILD_TESTING)
   target_link_libraries(runtime_sessions_smoke_test PRIVATE evr::runtime evr::yolov8_person_detection)
   evr_apply_common_settings(runtime_sessions_smoke_test)
   add_test(NAME runtime_sessions_smoke_test COMMAND runtime_sessions_smoke_test)
+
+  if(EVR_ENABLE_GRPC)
+    add_executable(runtime_supervisor_grpc_service_test
+      tests/runtime_supervisor_grpc_service_test.cpp)
+    target_link_libraries(runtime_supervisor_grpc_service_test
+      PRIVATE evr::runtime evr::runtime_contracts)
+    evr_apply_common_settings(runtime_supervisor_grpc_service_test)
+    add_test(NAME runtime_supervisor_grpc_service_test
+      COMMAND runtime_supervisor_grpc_service_test)
+  endif()
 
   add_executable(runtime_observability_ndjson_smoke_test
     tests/runtime_observability_ndjson_smoke_test.cpp)
