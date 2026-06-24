@@ -23,7 +23,7 @@ Runtime implements:
 - `GetSupervisorStatus`
 - `GetDeploymentStatus`
 
-`Handshake` negotiates protocol version and exposes runtime capability. `ApplyDeployment` accepts the declarative `ExecutionRequest`; for the multi-stream example, it contains several `RuntimeSourceBinding` entries and one `RuntimeAlgorithmBinding` whose `input_binding_ids` reference all sources.
+`Handshake` negotiates protocol version and exposes runtime capability. `ApplyDeployment` accepts the declarative `ExecutionRequest`; for the multi-source / multi-algorithm example, it contains several `RuntimeSourceBinding` entries and a DAG of `RuntimeAlgorithmBinding` entries whose `input_binding_ids` reference source bindings or upstream algorithm bindings.
 
 ## Build
 
@@ -59,13 +59,14 @@ EDGEVISION_RUNTIME_ENDPOINT=127.0.0.1:19090
 
 ## Current Scope
 
-The initial C++ implementation validates the gRPC boundary and stores accepted deployment requests in memory:
+The current C++ implementation validates the gRPC boundary, normalizes the declarative request into an internal execution graph, and stores accepted deployment state in memory:
 
 - reject `ApplyDeployment` before `Handshake`
 - reject mismatched `node_id`
 - require at least one source
-- require exactly one algorithm binding
-- require the algorithm binding to reference all source bindings
+- require at least one algorithm binding
+- require every algorithm binding to reference only declared sources or upstream algorithm bindings
+- normalize the accepted request into a graph with supervisor/source/algorithm/output nodes
+- expose deployment status as an in-memory lifecycle snapshot
 
-The next step is mapping `ApplyDeploymentRequest.ExecutionRequest` into `Phase1DeploymentSpec` and then into the real source/worker/graph lifecycle.
-
+The remaining step is wiring that normalized graph into the real source / worker / graph lifecycle so that `ApplyDeploymentRequest.ExecutionRequest` becomes an executing runtime topology rather than only an accepted control-plane intent.
